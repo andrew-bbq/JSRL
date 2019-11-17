@@ -1,8 +1,60 @@
 <!DOCTYPE html>
 <head>
 
+    <link rel="stylesheet" href="Include/style.css">
+    <link rel="stylesheet" href="Include/bootstrap/css/bootstrap.min.css">
+    <script src="Include/bootstrap/js/bootstrap.min.js"></script>
 </head>
 <body>
-    <canvas id="game" width="400" height="400"></canvas>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12 text-center pt-5 pb-5">
+                <h1>Untitled</h1>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-3"></div>
+            <div class="col-lg-6 text-center">
+                <canvas id="game" width="400" height="400"></canvas>
+            </div>
+            <div class="col-sm-3">
+                <div class="row text-center pt-3">
+                    <h2 id="player-name">{{player name}}</h2>
+                </div>
+                <div class="row">
+                    <span id="player-info-race-age">{{race and age}}</span>
+                </div>
+                <div class="row">
+                    <span id="player-info-backstory">{{backstory}}</span>
+                </div>
+                <div class="row text-left">
+                    <span id="player-con">{{player con}}</span>
+                </div>
+                <div class="row text-left">
+                    <span id="player-str">{{player str}}</span>
+                </div>
+                <div class="row text-left">
+                    <span id="player-dex">{{player dex}}</span>
+                </div>
+                <div class="row text-left">
+                    <span id="player-int">{{player int}}</span>
+                </div>
+                <div class="row text-left">
+                    <span id="player-arm">{{player arm}}</span>
+                </div>
+                <div class="row text-left">
+                    <span id="player-wil">{{player wil}}</span>
+                </div>
+                <div class="row text-left">
+                    <span id="player-mem">{{player mem}}</span>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-12">
+
+            </div>
+        </div>
+    </div>
 </body>
 <script src="Scripts/main.js"></script>
