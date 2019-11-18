@@ -433,7 +433,6 @@ function getShortestPathAvoidingWalls(point1, point2){
     }
     var minPath = paths[0];
     for(var i = 0; i < paths.length; i++){
-        console.log(paths[i][0]);
         if(paths[i][0] < minPath[0]){
             minPath = paths[i];
         }
