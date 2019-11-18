@@ -20,6 +20,13 @@ function drawGame() {
         }
     }
 
+    if(newOne.moveQueue.length){
+        gameMap[playerCoords.y][playerCoords.x].removeContentByType("Player");
+        var newCoords = newOne.moveQueue.shift();
+        gameMap[newCoords.y][newCoords.x].addContents(newOne);
+        playerCoords = newCoords;
+    }
+
     ctx.fillStyle = "#ff0000";
     ctx.fillText("FPS: " + framesLastSecond, 10, 20);
 
@@ -41,13 +48,15 @@ canvas.addEventListener('mousedown', function (e) {
     clickLocation = getCursorPosition(canvas, e);
     squareX = Math.floor(clickLocation.x / tileW);
     squareY = Math.floor(clickLocation.y / tileH);
+    if(squareX == selectorCoords.x && squareY == selectorCoords.y){
+        newOne.moveQueue = getShortestPath(playerCoords, selectorCoords);
+    }
     if (selectorCoords.x != null && selectorCoords != null) {
         gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
     }
     gameMap[squareY][squareX].addContents(new Selector());
     selectorCoords.x = squareX;
     selectorCoords.y = squareY;
-    console.log(getShortestPath(playerCoords, selectorCoords));
 });
 
 const skills = {
@@ -398,9 +407,6 @@ function generateName(charGender) {
 }
 
 function pointIsValid(point){
-    if (!(point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH && gameMap[point.y][point.x].type < 100)){
-        console.log(point);
-    }
     return (point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH && gameMap[point.y][point.x].type < 100);
 }
 
@@ -412,6 +418,10 @@ function pointToString(point){
     return "x: "+point.x+",y: "+point.y;
 }
 
+/**
+ * Djikstra's min-path algorithm, can be improved by caching the min-path array but I'll worry about that when performance is bad 
+ * (Djikstra's on a 25x25 grid hopefully shouldn't be an issue in 2019)
+ */
 const MAX_DISTANCE = 123456;
 const COL_NUM = [-1, 1, 0, 0];
 const ROW_NUM = [0, 0, -1, 1];
