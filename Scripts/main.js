@@ -13,8 +13,10 @@ function drawGame() {
 
     for (var y = 0; y < mapH; y++) {
         for (var x = 0; x < mapW; x++) {
-            ctx.fillStyle = gameMap[y][x].displayColor;
+            ctx.fillStyle = gameMap[y][x].outlineColor;
             ctx.fillRect(x * tileW, y * tileH, tileW, tileH);
+            ctx.fillStyle = gameMap[y][x].displayColor;
+            ctx.fillRect(x * tileW + 1, y * tileH + 1, tileW - 2, tileH - 2);
         }
     }
 
@@ -28,7 +30,6 @@ function getCursorPosition(canvas, event) {
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    console.log("x: " + x + " y: " + y);
     return {
         x: x,
         y: y
@@ -37,8 +38,34 @@ function getCursorPosition(canvas, event) {
 
 const canvas = document.querySelector('canvas');
 canvas.addEventListener('mousedown', function (e) {
-    getCursorPosition(canvas, e);
+    clickLocation = getCursorPosition(canvas, e);
+    squareX = Math.floor(clickLocation.x / tileW);
+    squareY = Math.floor(clickLocation.y / tileH);
+    if(selectorCoords.x != null && selectorCoords != null){
+        gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
+    }
+    gameMap[squareY][squareX].addContents(new Selector());
+    selectorCoords.x = squareX;
+    selectorCoords.y = squareY;
+    visited = [];
+    console.log(getShortestPathAvoidingWalls(playerCoords, selectorCoords));
 });
+
+const skills = {
+    sword: [],
+    axe: [],
+    spear: [],
+    bow: [],
+    rifle: [],
+    handgun: [],
+    shotgun: [],
+    fire: [],
+    water: [],
+    air: [],
+    earth: [],
+    white: [],
+    dark: [],
+}
 
 const races = [
     ["Human", [7, 7, 7, 7, 4, 7]],
@@ -97,13 +124,28 @@ const adultStory = [
 class WorldObject {
     priority = 0;
     color = "#101010";
-    constructor(priority, color){
+    outline = false;
+    constructor(priority, color, outline) {
         this.priority = priority;
         this.color = color;
+        this.outline = outline;
+    }
+
+    typeString() {
+        return "WorldObject";
     }
 }
 
-class Character extends WorldObject{
+class Selector extends WorldObject {
+    constructor() {
+        super(-1, "#FF0000", true);
+    }
+    typeString() {
+        return "Selector";
+    }
+}
+
+class Character extends WorldObject {
     name = "Adarsh Rajaraman";
     gender = 0;
     age = 18;
@@ -124,7 +166,7 @@ class Character extends WorldObject{
     race = 0;
     backstory = [0, 0];
     constructor() {
-        super(1000, "#FF00AA");
+        super(1000, "#AA00AA", false);
         this.backstory = [Math.floor(Math.random() * childStory.length), Math.floor(Math.random() * adultStory.length)];
         this.age += Math.floor(Math.random() * 50);
         this.mem -= Math.floor((this.age - 18) / 11);
@@ -138,28 +180,38 @@ class Character extends WorldObject{
         this.gender = Math.floor(Math.random() * 2);
         this.name = generateName(this.gender) + " " + generateName(2);
     }
+
+    typeString() {
+        return "Character";
+    }
 }
 
 class Player extends Character {
-    constructor(){
+    moveQueue = [];
+    constructor() {
         super();
+    }
+
+    typeString() {
+        return "Player";
     }
 }
 
 class Tile {
     defaultColor = "#000000";
     displayColor = "#000000";
-    ground = 0;
+    outlineColor = "#000000";
+    type = 0;
     contents = [];
-    constructor(ground, contents, color) {
-        this.ground = ground;
+    constructor(type, contents, color) {
+        this.type = type;
         this.contents.concat(contents);
         this.defaultColor = color;
         this.updateOverride();
     }
 
-    addContents (contents) {
-        if(Array.isArray(contents)) {
+    addContents(contents) {
+        if (Array.isArray(contents)) {
             this.contents.concat(contents);
         } else {
             this.contents.push(contents);
@@ -167,18 +219,49 @@ class Tile {
         this.updateOverride();
     }
 
-    updateOverride () {
-        if(this.contents.length == 0){
+    updateOverride() {
+        if (this.contents.length == 0) {
             this.displayColor = this.defaultColor;
+            this.outlineColor = this.defaultColor;
         } else {
+            var currentlyOutlined = false;
             var currentDisplayItem = this.contents[0];
-            for(var i = 1; i < this.contents.length; i++){
-                if(this.contents[i].priority > currentDisplayItem.priority){
+            for (var i = 1; i < this.contents.length; i++) {
+                if (this.contents[i].outline) {
+                    currentlyOutlined = true;
+                    this.outlineColor = this.contents[i].color;
+                } else if (this.contents[i].priority > currentDisplayItem.priority) {
                     currentDisplayItem = this.contents[i];
                 }
             }
-            this.displayColor = currentDisplayItem.color;
+            if (currentDisplayItem.outline) {
+                this.displayColor = this.defaultColor;
+                this.outlineColor = currentDisplayItem.color;
+            } else {
+                this.displayColor = currentDisplayItem.color;
+                if(!currentlyOutlined){
+                    this.outlineColor = this.displayColor;
+                }
+            }
         }
+    }
+
+    removeContentByType(toRemove) {
+        for(var i = 0; i < this.contents.length; i++){
+            if(this.contents[i].typeString() == toRemove){
+                this.contents.splice(i, 1);
+            }
+        }
+        this.updateOverride();
+    }
+
+    includesContentByType(toFind) {
+        for(var i = 0; i < this.contents.length; i++){
+            if(this.contents[i].typeString() == toFind){
+                return true;
+            }
+        }
+        return false;
     }
 }
 
@@ -315,6 +398,51 @@ function generateName(charGender) {
     return name;
 }
 
+var visited = [];
+function getShortestPathAvoidingWalls(point1, point2){
+    if(point1.y < 0 || point1.y >= gameMap.length){
+        return [1001, []];
+    }
+    if(point1.x < 0 || point1.x >= gameMap[point1.y].length){
+        return [1002, []];
+    }
+    if(gameMap[point1.y][point1.x].type > 99) {
+        return [1003, []];
+    }
+    if(gameMap[point1.y][point1.x].includesContentByType("Character")) {
+        return [1004, []];
+    }
+    for(var i = 0; i < visited.length; i++){
+        if (visited[i].x == point1.x && visited[i].y == point1.y){
+            return [1005, []];
+        }
+    }
+    if(point1.x == point2.x && point1.y == point2.y){
+        return [1, [point2]];
+    }
+    visited.push(point1);
+    var adjacentPoints = [
+        {x: (point1.x - 1), y: point1.y},
+        {x: (point1.x + 1), y: point1.y},
+        {x: point1.x, y: (point1.y - 1)},
+        {x: point1.x, y: (point1.y + 1)},
+    ];
+    var paths = [];
+    for(var i = 0; i < adjacentPoints.length; i++) {
+        paths.push(getShortestPathAvoidingWalls(adjacentPoints[i], point2));
+    }
+    var minPath = paths[0];
+    for(var i = 0; i < paths.length; i++){
+        console.log(paths[i][0]);
+        if(paths[i][0] < minPath[0]){
+            minPath = paths[i];
+        }
+    }
+    minPath[0]++;
+    minPath[1].push(point1);
+    return minPath;
+}
+
 var newOne = new Player();
 document.getElementById("player-name").innerHTML = newOne.name;
 document.getElementById("player-info-race-age").innerHTML = newOne.age + " year-old " + (newOne.gender == 0 ? "male " : "female ") + races[newOne.race][0];
@@ -336,25 +464,25 @@ const E = 2;
 const S = 4;
 const W = 8;
 
-// constant values for tile colors
-const grassColor = "#03A313";
-
 // tile width, height, map width, height, and frame information for display
 var tileW = 16, tileH = 16;
 var mapW = 25, mapH = 25;
 var currentSecond = 0, frameCount = 0, framesLastSecond = 0;
+var selectorCoords = { x: null, y: null };
+var playerCoords = { x: null, y: null };
 
 var gameMap = [];
-for(var i = 0; i < 25; i++){
+for (var i = 0; i < 25; i++) {
     // create new array
     var row = [];
-    for(var j = 0; j < 25; j++){
+    for (var j = 0; j < 25; j++) {
         row.push(newGrassTile());
     }
     gameMap.push(row);
 }
 
 gameMap[12][12].addContents(newOne);
+playerCoords = {x: 12, y: 12};
 
 // start game on load
 window.onload = function () {
@@ -364,8 +492,8 @@ window.onload = function () {
 }
 
 function newGrassTile() {
-    return new Tile(0,[],grassColor);
+    return new Tile(0, [], "#03A313");
 }
-function newWallTile(){
-    return new Tile(1,[],"#505050");
+function newWallTile() {
+    return new Tile(100, [], "#505050");
 }
