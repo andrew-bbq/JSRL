@@ -11,8 +11,8 @@ function drawGame() {
         frameCount++;
     }
 
-    for (var y = 0; y < mapH; y++) {
-        for (var x = 0; x < mapW; x++) {
+    for (var y = 0; y < renderH; y++) {
+        for (var x = 0; x < renderW; x++) {
             ctx.fillStyle = gameMap[y][x].outlineColor;
             ctx.fillRect(x * tileW, y * tileH, tileW, tileH);
             ctx.fillStyle = gameMap[y][x].displayColor;
@@ -41,14 +41,13 @@ canvas.addEventListener('mousedown', function (e) {
     clickLocation = getCursorPosition(canvas, e);
     squareX = Math.floor(clickLocation.x / tileW);
     squareY = Math.floor(clickLocation.y / tileH);
-    if(selectorCoords.x != null && selectorCoords != null){
+    if (selectorCoords.x != null && selectorCoords != null) {
         gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
     }
     gameMap[squareY][squareX].addContents(new Selector());
     selectorCoords.x = squareX;
     selectorCoords.y = squareY;
-    visited = [];
-    console.log(getShortestPathAvoidingWalls(playerCoords, selectorCoords));
+    console.log(getShortestPath(playerCoords, selectorCoords));
 });
 
 const skills = {
@@ -239,7 +238,7 @@ class Tile {
                 this.outlineColor = currentDisplayItem.color;
             } else {
                 this.displayColor = currentDisplayItem.color;
-                if(!currentlyOutlined){
+                if (!currentlyOutlined) {
                     this.outlineColor = this.displayColor;
                 }
             }
@@ -247,8 +246,8 @@ class Tile {
     }
 
     removeContentByType(toRemove) {
-        for(var i = 0; i < this.contents.length; i++){
-            if(this.contents[i].typeString() == toRemove){
+        for (var i = 0; i < this.contents.length; i++) {
+            if (this.contents[i].typeString() == toRemove) {
                 this.contents.splice(i, 1);
             }
         }
@@ -256,8 +255,8 @@ class Tile {
     }
 
     includesContentByType(toFind) {
-        for(var i = 0; i < this.contents.length; i++){
-            if(this.contents[i].typeString() == toFind){
+        for (var i = 0; i < this.contents.length; i++) {
+            if (this.contents[i].typeString() == toFind) {
                 return true;
             }
         }
@@ -398,48 +397,68 @@ function generateName(charGender) {
     return name;
 }
 
-var visited = [];
-function getShortestPathAvoidingWalls(point1, point2){
-    if(point1.y < 0 || point1.y >= gameMap.length){
-        return [1001, []];
+function pointIsValid(point){
+    if (!(point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH && gameMap[point.y][point.x].type < 100)){
+        console.log(point);
     }
-    if(point1.x < 0 || point1.x >= gameMap[point1.y].length){
-        return [1002, []];
-    }
-    if(gameMap[point1.y][point1.x].type > 99) {
-        return [1003, []];
-    }
-    if(gameMap[point1.y][point1.x].includesContentByType("Character")) {
-        return [1004, []];
-    }
-    for(var i = 0; i < visited.length; i++){
-        if (visited[i].x == point1.x && visited[i].y == point1.y){
-            return [1005, []];
+    return (point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH && gameMap[point.y][point.x].type < 100);
+}
+
+function pointsAreEqual(point1, point2){
+    return (point1.x == point2.x && point1.y == point2.y);
+}
+
+function pointToString(point){
+    return "x: "+point.x+",y: "+point.y;
+}
+
+const MAX_DISTANCE = 123456;
+const COL_NUM = [-1, 1, 0, 0];
+const ROW_NUM = [0, 0, -1, 1];
+function getShortestPath(point1, point2) {
+    var dist = [];
+    var visited = [];
+    var minPaths = [];
+    for (var y = 0; y < renderH; y++) {
+        var distCol = [];
+        var visCol = [];
+        var pathCol = [];
+        for (var x = 0; x < renderW; x++) {
+            distCol.push(MAX_DISTANCE);
+            visCol.push(false);
+            pathCol.push([]);
         }
+        dist.push(distCol);
+        visited.push(visCol);
+        minPaths.push(pathCol);
     }
-    if(point1.x == point2.x && point1.y == point2.y){
-        return [1, [point2]];
-    }
-    visited.push(point1);
-    var adjacentPoints = [
-        {x: (point1.x - 1), y: point1.y},
-        {x: (point1.x + 1), y: point1.y},
-        {x: point1.x, y: (point1.y - 1)},
-        {x: point1.x, y: (point1.y + 1)},
-    ];
-    var paths = [];
-    for(var i = 0; i < adjacentPoints.length; i++) {
-        paths.push(getShortestPathAvoidingWalls(adjacentPoints[i], point2));
-    }
-    var minPath = paths[0];
-    for(var i = 0; i < paths.length; i++){
-        if(paths[i][0] < minPath[0]){
-            minPath = paths[i];
+
+    dist[point1.y][point1.x] = 0;
+    visited[point1.y][point1.x] = true;
+    var queue = [];
+    queue.push(point1);
+
+    while(queue.length){
+        var current = queue.shift();
+        if(!pointIsValid(current)){
+            continue;
         }
+        visited[current.y][current.x] = true;
+        adjacentNodes = [];
+        for(var i = 0; i < 4; i++){
+            adjacentNodes.push({x: current.x + ROW_NUM[i], y: current.y + COL_NUM[i]});
+        }
+        for(var i = 0; i < adjacentNodes.length; i++){
+            if(pointIsValid(adjacentNodes[i]) && dist[adjacentNodes[i].y][adjacentNodes[i].x] > dist[current.y][current.x] + 1){
+                dist[adjacentNodes[i].y][adjacentNodes[i].x] = dist[current.y][current.x] + 1;
+                toAdd = [...minPaths[current.y][current.x]];
+                toAdd.push(adjacentNodes[i]);
+                minPaths[adjacentNodes[i].y][adjacentNodes[i].x] = toAdd;
+                queue.push(adjacentNodes[i]);
+            }
+        } 
     }
-    minPath[0]++;
-    minPath[1].push(point1);
-    return minPath;
+    return minPaths[point2.y][point2.x];
 }
 
 var newOne = new Player();
@@ -464,24 +483,31 @@ const S = 4;
 const W = 8;
 
 // tile width, height, map width, height, and frame information for display
-var tileW = 16, tileH = 16;
-var mapW = 25, mapH = 25;
+
+var canvasSize = 400;
+var renderW = 25, renderH = 25;
+var tileW = canvasSize / renderW, tileH = canvasSize / renderH;
 var currentSecond = 0, frameCount = 0, framesLastSecond = 0;
 var selectorCoords = { x: null, y: null };
 var playerCoords = { x: null, y: null };
 
 var gameMap = [];
-for (var i = 0; i < 25; i++) {
+for (var i = 0; i < renderH; i++) {
     // create new array
     var row = [];
-    for (var j = 0; j < 25; j++) {
+    for (var j = 0; j < renderW; j++) {
         row.push(newGrassTile());
     }
     gameMap.push(row);
 }
 
+gameMap[9][13] = newWallTile();
+gameMap[9][11] = newWallTile();
+gameMap[9][12] = newWallTile();
+
 gameMap[12][12].addContents(newOne);
-playerCoords = {x: 12, y: 12};
+
+playerCoords = { x: 12, y: 12 };
 
 // start game on load
 window.onload = function () {
