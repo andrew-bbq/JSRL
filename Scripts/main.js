@@ -2,7 +2,7 @@ var tick = 0;
 var gameSpeed = 6;
 var playerTookTurn = false;
 
-// render
+// render - this is the main loop, update everything where the tick is specified
 function drawGame() {
     if (ctx == null) { return; }
 
@@ -29,11 +29,20 @@ function drawGame() {
     // update everything on this tick
     if (tick >= gameSpeed) {
         if (playerChar.moveQueue.length && !playerTookTurn) {
-            gameMap[playerCoords.y][playerCoords.x].removeContentByType("Player");
             var newCoords = playerChar.moveQueue.shift();
-            gameMap[newCoords.y][newCoords.x].addContents(playerChar);
-            playerCoords = newCoords;
-            playerTookTurn = true;
+            if (Array.isArray(newCoords)){
+                var coordsToActOn = newCoords[1];
+                switch(newCoords[0]){
+                    case LOOT:
+                        // looting does not take up an action so do not set playerTookTurn to true
+                        openContainer(coordsToActOn);
+                }
+            } else {
+                gameMap[playerCoords.y][playerCoords.x].removeContentByType("Player");
+                gameMap[newCoords.y][newCoords.x].addContents(playerChar);
+                playerCoords = newCoords;
+                playerTookTurn = true;
+            }
         }
         tick = 0;
     }
@@ -90,6 +99,7 @@ canvas.addEventListener('mousedown', function (e) {
         if (gameMap[selectorCoords.y][selectorCoords.x].type < 100) {
             document.getElementById("actions-tile").innerHTML += getMoveButton();
         }
+        document.getElementById("actions-tile").innerHTML += getDeselectButton();
     }
 });
 
@@ -99,6 +109,23 @@ function getMoveButton() {
 
 function getLootButton() {
     return "<button onclick='moveAndLootSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
+}
+
+function getDeselectButton() {
+    return "<button onclick='removeSelector()' class='mr-2'><i class='fa fa-remove'></i><br/>Cancel</button>";
+}
+
+function openContainer(){
+
+}
+
+function removeSelector() {
+    gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
+    document.getElementById("selected-tile").innerHTML = "No tile selected";
+    document.getElementById("contents-of-tile").innerHTML = "";
+    document.getElementById("actions-tile").innerHTML = "";
+    selectorCoords.x = null;
+    selectorCoords.y = null;
 }
 
 function moveToSelector() {
@@ -114,7 +141,7 @@ function moveToSelector() {
 function moveAndLootSelector(){
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
-    playerChar.moveQueue.push();
+    playerChar.moveQueue.push([LOOT, selectorCoords]);
 }
 
 function getAdjacentPointClosestToPlayer(point) {
@@ -605,6 +632,9 @@ const W = 8;
 const PATH = 0;
 const DIST = 1;
 
+// constant values for actions in Player.moveQueue
+const LOOT = 0;
+
 // tile width, height, map width, height, and frame information for display
 
 var canvasSize = 400;
@@ -624,14 +654,7 @@ for (var i = 0; i < renderH; i++) {
     gameMap.push(row);
 }
 
-gameMap[9][13] = newWallTile();
-gameMap[9][11] = newWallTile();
-gameMap[9][12] = newWallTile();
-gameMap[8][13] = newWallTile();
-gameMap[7][13] = newWallTile();
-gameMap[7][12] = newWallTile();
-gameMap[7][11] = newWallTile();
-gameMap[8][11] = newWallTile();
+placeRectangle({x: 3, y: 5}, {x: 9, y: 13}, "newWallTile");
 
 gameMap[20][20].addContents(new Chest());
 
@@ -651,4 +674,19 @@ function newGrassTile() {
 }
 function newWallTile() {
     return new Tile(100, [], "#505050", "Stone Wall");
+}
+
+function placeRectangle(corner1, corner2, tileFunction){
+    var lowerX = Math.min(corner1.x, corner2.x);
+    var higherX = Math.max(corner1.x, corner2.x);
+    for(var i = lowerX; i <= higherX; i++){
+        gameMap[corner1.y][i] = window[tileFunction]();
+        gameMap[corner2.y][i] = window[tileFunction]();
+    }
+    var lowerY = Math.min(corner1.y, corner2.y);
+    var higherY = Math.max(corner1.y, corner2.y);
+    for(var i = lowerY + 1; i <= higherY - 1; i++){
+        gameMap[i][corner1.x] = window[tileFunction]();
+        gameMap[i][corner2.x] = window[tileFunction]()
+    }
 }
