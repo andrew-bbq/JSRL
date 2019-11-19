@@ -1,3 +1,6 @@
+var tick = 0;
+var gameSpeed = 6;
+
 // render
 function drawGame() {
     if (ctx == null) { return; }
@@ -11,6 +14,8 @@ function drawGame() {
         frameCount++;
     }
 
+    gameSpeed = Math.floor(framesLastSecond / 9);
+
     for (var y = 0; y < renderH; y++) {
         for (var x = 0; x < renderW; x++) {
             ctx.fillStyle = gameMap[y][x].outlineColor;
@@ -20,15 +25,20 @@ function drawGame() {
         }
     }
 
-    if(newOne.moveQueue.length){
-        gameMap[playerCoords.y][playerCoords.x].removeContentByType("Player");
-        var newCoords = newOne.moveQueue.shift();
-        gameMap[newCoords.y][newCoords.x].addContents(newOne);
-        playerCoords = newCoords;
+    if (tick >= gameSpeed) {
+        if (newOne.moveQueue.length) {
+            gameMap[playerCoords.y][playerCoords.x].removeContentByType("Player");
+            var newCoords = newOne.moveQueue.shift();
+            gameMap[newCoords.y][newCoords.x].addContents(newOne);
+            playerCoords = newCoords;
+        }
+        tick = 0;
     }
 
     ctx.fillStyle = "#ff0000";
     ctx.fillText("FPS: " + framesLastSecond, 10, 20);
+    
+    tick++;
 
     requestAnimationFrame(drawGame);
 }
@@ -48,15 +58,29 @@ canvas.addEventListener('mousedown', function (e) {
     clickLocation = getCursorPosition(canvas, e);
     squareX = Math.floor(clickLocation.x / tileW);
     squareY = Math.floor(clickLocation.y / tileH);
-    if(squareX == selectorCoords.x && squareY == selectorCoords.y){
+    if (squareX == selectorCoords.x && squareY == selectorCoords.y) {
         newOne.moveQueue = getShortestPath(playerCoords, selectorCoords);
-    }
-    if (selectorCoords.x != null && selectorCoords != null) {
         gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
+        document.getElementById("selected-tile").innerHTML = "No tile selected";
+        document.getElementById("contents-of-tile").innerHTML = "";
+        selectorCoords.x = null;
+        selectorCoords.y = null;
+    } else {
+        if (selectorCoords.x != null && selectorCoords != null) {
+            gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
+        }
+        gameMap[squareY][squareX].addContents(new Selector());
+        selectorCoords.x = squareX;
+        selectorCoords.y = squareY;
+        document.getElementById("selected-tile").innerHTML = gameMap[selectorCoords.y][selectorCoords.x].name;
+        var contentString = "";
+        for(var i = 0; i < gameMap[selectorCoords.y][selectorCoords.x].contents.length - 1; i++){
+            var typeString = gameMap[selectorCoords.y][selectorCoords.x].contents[i].typeString();
+            contentString += (typeString == "Character" || typeString == "Player" ? gameMap[selectorCoords.y][selectorCoords.x].contents[i].name : typeString) + "<br/>";
+        }
+        document.getElementById("contents-of-tile").innerHTML = "Contents: <br/>" +
+            (contentString.length == 0 ? "Nothing" : contentString);
     }
-    gameMap[squareY][squareX].addContents(new Selector());
-    selectorCoords.x = squareX;
-    selectorCoords.y = squareY;
 });
 
 const skills = {
@@ -211,11 +235,13 @@ class Tile {
     outlineColor = "#000000";
     type = 0;
     contents = [];
-    constructor(type, contents, color) {
+    name = "Blank Tile";
+    constructor(type, contents, color, name) {
         this.type = type;
         this.contents.concat(contents);
         this.defaultColor = color;
         this.updateOverride();
+        this.name = name;
     }
 
     addContents(contents) {
@@ -406,16 +432,16 @@ function generateName(charGender) {
     return name;
 }
 
-function pointIsValid(point){
+function pointIsValid(point) {
     return (point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH && gameMap[point.y][point.x].type < 100);
 }
 
-function pointsAreEqual(point1, point2){
+function pointsAreEqual(point1, point2) {
     return (point1.x == point2.x && point1.y == point2.y);
 }
 
-function pointToString(point){
-    return "x: "+point.x+",y: "+point.y;
+function pointToString(point) {
+    return "x: " + point.x + ",y: " + point.y;
 }
 
 /**
@@ -448,25 +474,25 @@ function getShortestPath(point1, point2) {
     var queue = [];
     queue.push(point1);
 
-    while(queue.length){
+    while (queue.length) {
         var current = queue.shift();
-        if(!pointIsValid(current)){
+        if (!pointIsValid(current)) {
             continue;
         }
         visited[current.y][current.x] = true;
         adjacentNodes = [];
-        for(var i = 0; i < 4; i++){
-            adjacentNodes.push({x: current.x + ROW_NUM[i], y: current.y + COL_NUM[i]});
+        for (var i = 0; i < 4; i++) {
+            adjacentNodes.push({ x: current.x + ROW_NUM[i], y: current.y + COL_NUM[i] });
         }
-        for(var i = 0; i < adjacentNodes.length; i++){
-            if(pointIsValid(adjacentNodes[i]) && dist[adjacentNodes[i].y][adjacentNodes[i].x] > dist[current.y][current.x] + 1){
+        for (var i = 0; i < adjacentNodes.length; i++) {
+            if (pointIsValid(adjacentNodes[i]) && dist[adjacentNodes[i].y][adjacentNodes[i].x] > dist[current.y][current.x] + 1) {
                 dist[adjacentNodes[i].y][adjacentNodes[i].x] = dist[current.y][current.x] + 1;
                 toAdd = [...minPaths[current.y][current.x]];
                 toAdd.push(adjacentNodes[i]);
                 minPaths[adjacentNodes[i].y][adjacentNodes[i].x] = toAdd;
                 queue.push(adjacentNodes[i]);
             }
-        } 
+        }
     }
     return minPaths[point2.y][point2.x];
 }
@@ -514,6 +540,11 @@ for (var i = 0; i < renderH; i++) {
 gameMap[9][13] = newWallTile();
 gameMap[9][11] = newWallTile();
 gameMap[9][12] = newWallTile();
+gameMap[8][13] = newWallTile();
+gameMap[7][13] = newWallTile();
+gameMap[7][12] = newWallTile();
+gameMap[7][11] = newWallTile();
+gameMap[8][11] = newWallTile();
 
 gameMap[12][12].addContents(newOne);
 
@@ -527,8 +558,8 @@ window.onload = function () {
 }
 
 function newGrassTile() {
-    return new Tile(0, [], "#03A313");
+    return new Tile(0, [], "#03A313", "Grass");
 }
 function newWallTile() {
-    return new Tile(100, [], "#505050");
+    return new Tile(100, [], "#505050", "Stone Wall");
 }
