@@ -1,5 +1,6 @@
 var tick = 0;
 var gameSpeed = 6;
+var playerTookTurn = false;
 
 // render
 function drawGame() {
@@ -25,20 +26,23 @@ function drawGame() {
         }
     }
 
+    // update everything on this tick
     if (tick >= gameSpeed) {
-        if (newOne.moveQueue.length) {
+        if (playerChar.moveQueue.length && !playerTookTurn) {
             gameMap[playerCoords.y][playerCoords.x].removeContentByType("Player");
-            var newCoords = newOne.moveQueue.shift();
-            gameMap[newCoords.y][newCoords.x].addContents(newOne);
+            var newCoords = playerChar.moveQueue.shift();
+            gameMap[newCoords.y][newCoords.x].addContents(playerChar);
             playerCoords = newCoords;
+            playerTookTurn = true;
         }
         tick = 0;
     }
 
     ctx.fillStyle = "#ff0000";
     ctx.fillText("FPS: " + framesLastSecond, 10, 20);
-    
+
     tick++;
+    playerTookTurn = false;
 
     requestAnimationFrame(drawGame);
 }
@@ -59,12 +63,7 @@ canvas.addEventListener('mousedown', function (e) {
     squareX = Math.floor(clickLocation.x / tileW);
     squareY = Math.floor(clickLocation.y / tileH);
     if (squareX == selectorCoords.x && squareY == selectorCoords.y) {
-        newOne.moveQueue = getShortestPath(playerCoords, selectorCoords);
-        gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
-        document.getElementById("selected-tile").innerHTML = "No tile selected";
-        document.getElementById("contents-of-tile").innerHTML = "";
-        selectorCoords.x = null;
-        selectorCoords.y = null;
+        moveToSelector();
     } else {
         if (selectorCoords.x != null && selectorCoords != null) {
             gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
@@ -74,14 +73,70 @@ canvas.addEventListener('mousedown', function (e) {
         selectorCoords.y = squareY;
         document.getElementById("selected-tile").innerHTML = gameMap[selectorCoords.y][selectorCoords.x].name;
         var contentString = "";
-        for(var i = 0; i < gameMap[selectorCoords.y][selectorCoords.x].contents.length - 1; i++){
+        var lootable = false;
+        var hasCharacter = false;
+        for (var i = 0; i < gameMap[selectorCoords.y][selectorCoords.x].contents.length - 1; i++) {
             var typeString = gameMap[selectorCoords.y][selectorCoords.x].contents[i].typeString();
+            if (typeString == "Character") hasCharacter = true;
+            if (gameMap[selectorCoords.y][selectorCoords.x].contents[i].containsLoot) lootable = true;
             contentString += (typeString == "Character" || typeString == "Player" ? gameMap[selectorCoords.y][selectorCoords.x].contents[i].name : typeString) + "<br/>";
         }
         document.getElementById("contents-of-tile").innerHTML = "Contents: <br/>" +
             (contentString.length == 0 ? "Nothing" : contentString);
+        document.getElementById("actions-tile").innerHTML = "";
+        if (lootable) {
+            document.getElementById("actions-tile").innerHTML += getLootButton();
+        }
+        if (gameMap[selectorCoords.y][selectorCoords.x].type < 100) {
+            document.getElementById("actions-tile").innerHTML += getMoveButton();
+        }
     }
 });
+
+function getMoveButton() {
+    return "<button onclick='moveToSelector()' class='mr-2'><i class='fa fa-hiking'></i><br/>Move</button>";
+}
+
+function getLootButton() {
+    return "<button onclick='moveAndLootSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
+}
+
+function moveToSelector() {
+    playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH);
+    gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
+    document.getElementById("selected-tile").innerHTML = "No tile selected";
+    document.getElementById("contents-of-tile").innerHTML = "";
+    document.getElementById("actions-tile").innerHTML = "";
+    selectorCoords.x = null;
+    selectorCoords.y = null;
+}
+
+function moveAndLootSelector(){
+    var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
+    playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
+    playerChar.moveQueue.push();
+}
+
+function getAdjacentPointClosestToPlayer(point) {
+    var adjPoints = [];
+    var minPoint = [MAX_DISTANCE, {x: MAX_DISTANCE, y: MAX_DISTANCE}];
+    for(var i = 0; i < 4; i++){
+        var toCheck = {x: point.x + ROW_NUM[i], y: point.y + COL_NUM[i]};
+        var curDist = getShortestPath(playerCoords, toCheck, DIST);
+        if(curDist < minPoint[0]){
+            minPoint = [curDist, toCheck];
+        }
+    }
+    if(minPoint[0] != MAX_DISTANCE){
+        return minPoint[1];
+    } else {
+        return playerCoords;
+    }
+}
+
+function getDistance(point1, point2){
+    return Math.sqrt(Math.pow(point1.x - point2.x, 2) + (Math.pow(point1.y - point2.y, 2)));
+}
 
 const skills = {
     sword: [],
@@ -157,10 +212,14 @@ class WorldObject {
     priority = 0;
     color = "#101010";
     outline = false;
-    constructor(priority, color, outline) {
+    containsLoot = false;
+    impassable = false;
+    constructor(priority, color, outline, lootable, impassable) {
         this.priority = priority;
         this.color = color;
         this.outline = outline;
+        this.containsLoot = lootable;
+        this.impassable = impassable;
     }
 
     typeString() {
@@ -168,9 +227,19 @@ class WorldObject {
     }
 }
 
+class Chest extends WorldObject {
+    constructor() {
+        super(1, "#BBAA10", false, true, true)
+    }
+
+    typeString(){
+        return "Chest";
+    }
+}
+
 class Selector extends WorldObject {
     constructor() {
-        super(-1, "#FF0000", true);
+        super(-1, "#FF0000", true, false, false);
     }
     typeString() {
         return "Selector";
@@ -198,7 +267,7 @@ class Character extends WorldObject {
     race = 0;
     backstory = [0, 0];
     constructor() {
-        super(1000, "#AA00AA", false);
+        super(1000, "#AA00AA", false, false, true);
         this.backstory = [Math.floor(Math.random() * childStory.length), Math.floor(Math.random() * adultStory.length)];
         this.age += Math.floor(Math.random() * 50);
         this.mem -= Math.floor((this.age - 18) / 11);
@@ -433,7 +502,15 @@ function generateName(charGender) {
 }
 
 function pointIsValid(point) {
-    return (point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH && gameMap[point.y][point.x].type < 100);
+    var isInbounds = (point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH);
+    if(!isInbounds) return isInbounds;
+    var containsImpassableObject = false;
+    for(var i = 0; i < gameMap[point.y][point.x].contents.length; i++){
+        if(gameMap[point.y][point.x].contents[i].impassable && gameMap[point.y][point.x].contents[i].typeString() !== "Player"){
+            containsImpassableObject = true;
+        }
+    }
+    return (isInbounds && gameMap[point.y][point.x].type < 100 && !containsImpassableObject);
 }
 
 function pointsAreEqual(point1, point2) {
@@ -451,7 +528,7 @@ function pointToString(point) {
 const MAX_DISTANCE = 123456;
 const COL_NUM = [-1, 1, 0, 0];
 const ROW_NUM = [0, 0, -1, 1];
-function getShortestPath(point1, point2) {
+function getShortestPath(point1, point2, returnType) {
     var dist = [];
     var visited = [];
     var minPaths = [];
@@ -494,20 +571,26 @@ function getShortestPath(point1, point2) {
             }
         }
     }
-    return minPaths[point2.y][point2.x];
+    switch(returnType){
+        case PATH:
+            return minPaths[point2.y][point2.x];
+        case DIST:
+            return dist[point2.y][point2.x];
+    }
+    
 }
 
-var newOne = new Player();
-document.getElementById("player-name").innerHTML = newOne.name;
-document.getElementById("player-info-race-age").innerHTML = newOne.age + " year-old " + (newOne.gender == 0 ? "male " : "female ") + races[newOne.race][0];
-document.getElementById("player-info-backstory").innerHTML = childStory[newOne.backstory[0]][0] + ", " + adultStory[newOne.backstory[1]][0];
-document.getElementById("player-con").innerHTML = "CON: " + newOne.con;
-document.getElementById("player-str").innerHTML = "STR: " + newOne.str;
-document.getElementById("player-dex").innerHTML = "DEX: " + newOne.dex;
-document.getElementById("player-int").innerHTML = "INT: " + newOne.int;
-document.getElementById("player-arm").innerHTML = "ARM: " + newOne.arm;
-document.getElementById("player-wil").innerHTML = "WIL: " + newOne.wil;
-document.getElementById("player-mem").innerHTML = "MEM: " + newOne.mem;
+var playerChar = new Player();
+document.getElementById("player-name").innerHTML = playerChar.name;
+document.getElementById("player-info-race-age").innerHTML = playerChar.age + " year-old " + (playerChar.gender == 0 ? "male " : "female ") + races[playerChar.race][0];
+document.getElementById("player-info-backstory").innerHTML = childStory[playerChar.backstory[0]][0] + ", " + adultStory[playerChar.backstory[1]][0];
+document.getElementById("player-con").innerHTML = "CON: " + playerChar.con;
+document.getElementById("player-str").innerHTML = "STR: " + playerChar.str;
+document.getElementById("player-dex").innerHTML = "DEX: " + playerChar.dex;
+document.getElementById("player-int").innerHTML = "INT: " + playerChar.int;
+document.getElementById("player-arm").innerHTML = "ARM: " + playerChar.arm;
+document.getElementById("player-wil").innerHTML = "WIL: " + playerChar.wil;
+document.getElementById("player-mem").innerHTML = "MEM: " + playerChar.mem;
 
 // context for game (initialized null)
 var ctx = null;
@@ -517,6 +600,10 @@ const N = 1;
 const E = 2;
 const S = 4;
 const W = 8;
+
+// constant values for getShortestDistance
+const PATH = 0;
+const DIST = 1;
 
 // tile width, height, map width, height, and frame information for display
 
@@ -546,7 +633,9 @@ gameMap[7][12] = newWallTile();
 gameMap[7][11] = newWallTile();
 gameMap[8][11] = newWallTile();
 
-gameMap[12][12].addContents(newOne);
+gameMap[20][20].addContents(new Chest());
+
+gameMap[12][12].addContents(playerChar);
 
 playerCoords = { x: 12, y: 12 };
 
