@@ -160,7 +160,8 @@ function openContainer(){
 function moveAndToggleDoor(){
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
-    playerChar.moveQueue.push([OPEN, selectorCoords]);
+    playerChar.moveQueue.push([OPEN, {x: selectorCoords.x, y: selectorCoords.y}]);
+    removeSelector();
 }
 
 function removeSelector() {
@@ -185,7 +186,8 @@ function moveToSelector() {
 function moveAndLootSelector(){
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
-    playerChar.moveQueue.push([LOOT, selectorCoords]);
+    playerChar.moveQueue.push([LOOT, {x: selectorCoords.x, y: selectorCoords.y}]);
+    removeSelector();
 }
 
 function getAdjacentPointClosestToPlayer(point) {
