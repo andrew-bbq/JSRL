@@ -83,10 +83,18 @@ canvas.addEventListener('mousedown', function (e) {
         document.getElementById("selected-tile").innerHTML = gameMap[selectorCoords.y][selectorCoords.x].name;
         var contentString = "";
         var lootable = false;
+        var hasDoor = false;
+        var isDoorOpen = false;
+        var isDoorLocked = false;
         var hasCharacter = false;
         for (var i = 0; i < gameMap[selectorCoords.y][selectorCoords.x].contents.length - 1; i++) {
             var typeString = gameMap[selectorCoords.y][selectorCoords.x].contents[i].typeString();
             if (typeString == "Character") hasCharacter = true;
+            if (typeString == "Door"){
+                hasDoor = true;
+                isDoorLocked = gameMap[selectorCoords.y][selectorCoords.x].contents[i].locked;
+                isDoorOpen = !gameMap[selectorCoords.y][selectorCoords.x].contents[i].impassable;
+            }
             if (gameMap[selectorCoords.y][selectorCoords.x].contents[i].containsLoot) lootable = true;
             contentString += (typeString == "Character" || typeString == "Player" ? gameMap[selectorCoords.y][selectorCoords.x].contents[i].name : typeString) + "<br/>";
         }
@@ -95,6 +103,17 @@ canvas.addEventListener('mousedown', function (e) {
         document.getElementById("actions-tile").innerHTML = "";
         if (lootable) {
             document.getElementById("actions-tile").innerHTML += getLootButton();
+        }
+        if (hasDoor) {
+            if(isDoorOpen){
+                document.getElementById("actions-tile").innerHTML += getCloseButton();
+            } else {
+                if(isDoorLocked){
+                    document.getElementById("actions-tile").innerHTML += getDisabledOpenButton();
+                } else {
+                    document.getElementById("actions-tile").innerHTML += getOpenButton();
+                }
+            }
         }
         if (gameMap[selectorCoords.y][selectorCoords.x].type < 100) {
             document.getElementById("actions-tile").innerHTML += getMoveButton();
@@ -109,6 +128,20 @@ function getMoveButton() {
 
 function getLootButton() {
     return "<button onclick='moveAndLootSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
+}
+
+function getOpenButton() {
+    return "<button onclick='moveAndOpenDoor()' class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
+}
+
+function getDisabledOpenButton(){
+    function getOpenButton() {
+        return "<button disabled class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
+    }
+}
+
+function getCloseButton() {
+    return "<button onclick='moveAndCloseDoor()' class='mr-2'><i class='fa fa-door-closed'></i><br/>Open</button>"
 }
 
 function getDeselectButton() {
@@ -261,6 +294,25 @@ class Chest extends WorldObject {
 
     typeString(){
         return "Chest";
+    }
+}
+
+class Door extends WorldObject {
+    locked = false;
+
+    constructor(locked) {
+        super(1, "#EEDD00", false, false, true);
+        this.locked = locked;
+    }
+
+    typeString(){
+        return "Door";
+    }
+
+    toggleOpen(){
+        if(!this.locked || !this.impassable) {
+            this.impassable = !this.impassable;
+        }
     }
 }
 
@@ -580,7 +632,7 @@ function getShortestPath(point1, point2, returnType) {
 
     while (queue.length) {
         var current = queue.shift();
-        if (!pointIsValid(current)) {
+        if (!pointIsValid(current) && !pointsAreEqual(current, playerCoords)) {
             continue;
         }
         visited[current.y][current.x] = true;
@@ -655,6 +707,9 @@ for (var i = 0; i < renderH; i++) {
 }
 
 placeRectangle({x: 3, y: 5}, {x: 9, y: 13}, "newWallTile");
+
+gameMap[9][9] = newGrassTile();
+gameMap[9][9].addContents(new Door(false));
 
 gameMap[20][20].addContents(new Chest());
 
