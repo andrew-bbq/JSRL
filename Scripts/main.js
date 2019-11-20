@@ -36,6 +36,12 @@ function drawGame() {
                     case LOOT:
                         // looting does not take up an action so do not set playerTookTurn to true
                         openContainer(coordsToActOn);
+                        break;
+                    case OPEN:
+                        gameMap[coordsToActOn.y][coordsToActOn.x].getFirstContentByType("Door").toggleOpen();
+                        gameMap[coordsToActOn.y][coordsToActOn.x].updateOverride();
+                        playerTookTurn = true;
+                        break;
                 }
             } else {
                 gameMap[playerCoords.y][playerCoords.x].removeContentByType("Player");
@@ -105,6 +111,7 @@ canvas.addEventListener('mousedown', function (e) {
             document.getElementById("actions-tile").innerHTML += getLootButton();
         }
         if (hasDoor) {
+
             if(isDoorOpen){
                 document.getElementById("actions-tile").innerHTML += getCloseButton();
             } else {
@@ -131,17 +138,15 @@ function getLootButton() {
 }
 
 function getOpenButton() {
-    return "<button onclick='moveAndOpenDoor()' class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
+    return "<button onclick='moveAndToggleDoor()' class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
 }
 
 function getDisabledOpenButton(){
-    function getOpenButton() {
-        return "<button disabled class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
-    }
+    return "<button disabled class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
 }
 
 function getCloseButton() {
-    return "<button onclick='moveAndCloseDoor()' class='mr-2'><i class='fa fa-door-closed'></i><br/>Open</button>"
+    return "<button onclick='moveAndToggleDoor()' class='mr-2'><i class='fa fa-door-closed'></i><br/>Close</button>"
 }
 
 function getDeselectButton() {
@@ -150,6 +155,12 @@ function getDeselectButton() {
 
 function openContainer(){
 
+}
+
+function moveAndToggleDoor(){
+    var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
+    playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
+    playerChar.moveQueue.push([OPEN, selectorCoords]);
 }
 
 function removeSelector() {
@@ -301,7 +312,7 @@ class Door extends WorldObject {
     locked = false;
 
     constructor(locked) {
-        super(1, "#EEDD00", false, false, true);
+        super(1, "#b38200", false, false, true);
         this.locked = locked;
     }
 
@@ -312,13 +323,14 @@ class Door extends WorldObject {
     toggleOpen(){
         if(!this.locked || !this.impassable) {
             this.impassable = !this.impassable;
+            this.outline = !this.impassable;
         }
     }
 }
 
 class Selector extends WorldObject {
     constructor() {
-        super(-1, "#FF0000", true, false, false);
+        super(1000, "#FF0000", true, false, false);
     }
     typeString() {
         return "Selector";
@@ -406,21 +418,27 @@ class Tile {
             this.displayColor = this.defaultColor;
             this.outlineColor = this.defaultColor;
         } else {
+            var currentOutlinePriority = (this.contents[0].outline ? this.contents[0].priority : -1000);
             var currentlyOutlined = false;
             var currentDisplayItem = this.contents[0];
             for (var i = 1; i < this.contents.length; i++) {
-                if (this.contents[i].outline) {
+                if (this.contents[i].outline && this.contents[i].priority > currentOutlinePriority) {
+                    currentOutlinePriority = this.contents[i].priority;
                     currentlyOutlined = true;
                     this.outlineColor = this.contents[i].color;
                 } else if (this.contents[i].priority > currentDisplayItem.priority) {
                     currentDisplayItem = this.contents[i];
                 }
             }
-            if (currentDisplayItem.outline) {
+            if (currentDisplayItem.outline && this.contents.length == 1) {
                 this.displayColor = this.defaultColor;
                 this.outlineColor = currentDisplayItem.color;
             } else {
-                this.displayColor = currentDisplayItem.color;
+                if (currentDisplayItem.outline){
+                    this.displayColor = this.defaultColor;
+                } else {
+                    this.displayColor = currentDisplayItem.color;
+                }
                 if (!currentlyOutlined) {
                     this.outlineColor = this.displayColor;
                 }
@@ -441,6 +459,15 @@ class Tile {
         for (var i = 0; i < this.contents.length; i++) {
             if (this.contents[i].typeString() == toFind) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    getFirstContentByType(toFind) {
+        for (var i = 0; i < this.contents.length; i++) {
+            if (this.contents[i].typeString() == toFind) {
+                return this.contents[i];
             }
         }
         return false;
@@ -686,6 +713,7 @@ const DIST = 1;
 
 // constant values for actions in Player.moveQueue
 const LOOT = 0;
+const OPEN = 1;
 
 // tile width, height, map width, height, and frame information for display
 
