@@ -30,9 +30,9 @@ function drawGame() {
     if (tick >= gameSpeed) {
         if (playerChar.moveQueue.length && !playerTookTurn) {
             var newCoords = playerChar.moveQueue.shift();
-            if (Array.isArray(newCoords)){
+            if (Array.isArray(newCoords)) {
                 var coordsToActOn = newCoords[1];
-                switch(newCoords[0]){
+                switch (newCoords[0]) {
                     case LOOT:
                         // looting does not take up an action so do not set playerTookTurn to true
                         openContainer(coordsToActOn);
@@ -96,7 +96,7 @@ canvas.addEventListener('mousedown', function (e) {
         for (var i = 0; i < gameMap[selectorCoords.y][selectorCoords.x].contents.length - 1; i++) {
             var typeString = gameMap[selectorCoords.y][selectorCoords.x].contents[i].typeString();
             if (typeString == "Character") hasCharacter = true;
-            if (typeString == "Door"){
+            if (typeString == "Door") {
                 hasDoor = true;
                 isDoorLocked = gameMap[selectorCoords.y][selectorCoords.x].contents[i].locked;
                 isDoorOpen = !gameMap[selectorCoords.y][selectorCoords.x].contents[i].impassable;
@@ -111,11 +111,10 @@ canvas.addEventListener('mousedown', function (e) {
             document.getElementById("actions-tile").innerHTML += getLootButton();
         }
         if (hasDoor) {
-
-            if(isDoorOpen){
+            if (isDoorOpen) {
                 document.getElementById("actions-tile").innerHTML += getCloseButton();
             } else {
-                if(isDoorLocked){
+                if (isDoorLocked) {
                     document.getElementById("actions-tile").innerHTML += getDisabledOpenButton();
                 } else {
                     document.getElementById("actions-tile").innerHTML += getOpenButton();
@@ -141,7 +140,7 @@ function getOpenButton() {
     return "<button onclick='moveAndToggleDoor()' class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
 }
 
-function getDisabledOpenButton(){
+function getDisabledOpenButton() {
     return "<button disabled class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
 }
 
@@ -153,14 +152,23 @@ function getDeselectButton() {
     return "<button onclick='removeSelector()' class='mr-2'><i class='fa fa-remove'></i><br/>Cancel</button>";
 }
 
-function openContainer(){
+function updateHealthDisplay() {
+    document.getElementById("health-head").innerHTML = "Head: "+playerChar.head +"%";
+    document.getElementById("health-rarm").innerHTML = "Right arm: "+playerChar.rightarm+"%";
+    document.getElementById("health-torso").innerHTML = "Torso: "+playerChar.torso+"%";
+    document.getElementById("health-larm").innerHTML = "Left arm: "+playerChar.leftarm+"%";
+    document.getElementById("health-rleg").innerHTML = "Right leg: "+playerChar.rightleg+"%";
+    document.getElementById("health-lleg").innerHTML = "Left leg: "+playerChar.leftleg+"%";
+}
+
+function openContainer() {
 
 }
 
-function moveAndToggleDoor(){
+function moveAndToggleDoor() {
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
-    playerChar.moveQueue.push([OPEN, {x: selectorCoords.x, y: selectorCoords.y}]);
+    playerChar.moveQueue.push([OPEN, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
 }
 
@@ -183,31 +191,31 @@ function moveToSelector() {
     selectorCoords.y = null;
 }
 
-function moveAndLootSelector(){
+function moveAndLootSelector() {
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
-    playerChar.moveQueue.push([LOOT, {x: selectorCoords.x, y: selectorCoords.y}]);
+    playerChar.moveQueue.push([LOOT, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
 }
 
 function getAdjacentPointClosestToPlayer(point) {
     var adjPoints = [];
-    var minPoint = [MAX_DISTANCE, {x: MAX_DISTANCE, y: MAX_DISTANCE}];
-    for(var i = 0; i < 4; i++){
-        var toCheck = {x: point.x + ROW_NUM[i], y: point.y + COL_NUM[i]};
+    var minPoint = [MAX_DISTANCE, { x: MAX_DISTANCE, y: MAX_DISTANCE }];
+    for (var i = 0; i < 4; i++) {
+        var toCheck = { x: point.x + ROW_NUM[i], y: point.y + COL_NUM[i] };
         var curDist = getShortestPath(playerCoords, toCheck, DIST);
-        if(curDist < minPoint[0]){
+        if (curDist < minPoint[0]) {
             minPoint = [curDist, toCheck];
         }
     }
-    if(minPoint[0] != MAX_DISTANCE){
+    if (minPoint[0] != MAX_DISTANCE) {
         return minPoint[1];
     } else {
         return playerCoords;
     }
 }
 
-function getDistance(point1, point2){
+function getDistance(point1, point2) {
     return Math.sqrt(Math.pow(point1.x - point2.x, 2) + (Math.pow(point1.y - point2.y, 2)));
 }
 
@@ -305,7 +313,7 @@ class Chest extends WorldObject {
         super(1, "#BBAA10", false, true, true)
     }
 
-    typeString(){
+    typeString() {
         return "Chest";
     }
 }
@@ -318,12 +326,12 @@ class Door extends WorldObject {
         this.locked = locked;
     }
 
-    typeString(){
+    typeString() {
         return "Door";
     }
 
-    toggleOpen(){
-        if(!this.locked || !this.impassable) {
+    toggleOpen() {
+        if (!this.locked || !this.impassable) {
             this.impassable = !this.impassable;
             this.outline = !this.impassable;
         }
@@ -350,6 +358,7 @@ class Character extends WorldObject {
     int = 7; // intelligence - magical damage
     arm = 7; // armor - physical resistance
     wil = 7; // willpower - magical resistance
+    
     status = 0;
     head = 100;
     torso = 100;
@@ -377,6 +386,24 @@ class Character extends WorldObject {
 
     typeString() {
         return "Character";
+    }
+}
+
+class Enemy extends Character {
+
+    typeString(){
+        return "Enemy";
+    }
+}
+
+class Corpse extends Character {
+    constructor() {
+        super();
+        this.containsLoot = true;
+    }
+
+    typeString(){
+        return "Corpse";
     }
 }
 
@@ -436,7 +463,7 @@ class Tile {
                 this.displayColor = this.defaultColor;
                 this.outlineColor = currentDisplayItem.color;
             } else {
-                if (currentDisplayItem.outline){
+                if (currentDisplayItem.outline) {
                     this.displayColor = this.defaultColor;
                 } else {
                     this.displayColor = currentDisplayItem.color;
@@ -611,10 +638,10 @@ function generateName(charGender) {
 
 function pointIsValid(point) {
     var isInbounds = (point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH);
-    if(!isInbounds) return isInbounds;
+    if (!isInbounds) return isInbounds;
     var containsImpassableObject = false;
-    for(var i = 0; i < gameMap[point.y][point.x].contents.length; i++){
-        if(gameMap[point.y][point.x].contents[i].impassable && gameMap[point.y][point.x].contents[i].typeString() !== "Player"){
+    for (var i = 0; i < gameMap[point.y][point.x].contents.length; i++) {
+        if (gameMap[point.y][point.x].contents[i].impassable && gameMap[point.y][point.x].contents[i].typeString() !== "Player") {
             containsImpassableObject = true;
         }
     }
@@ -679,13 +706,13 @@ function getShortestPath(point1, point2, returnType) {
             }
         }
     }
-    switch(returnType){
+    switch (returnType) {
         case PATH:
             return minPaths[point2.y][point2.x];
         case DIST:
             return dist[point2.y][point2.x];
     }
-    
+
 }
 
 var playerChar = new Player();
@@ -717,6 +744,14 @@ const DIST = 1;
 const LOOT = 0;
 const OPEN = 1;
 
+// constant values for equipment
+const HELMET = 0;
+const TORSO = 1;
+const TWOHAND = 2;
+const ONEHAND = 4;
+const PANTS = 8;
+const RING = 16;
+
 // tile width, height, map width, height, and frame information for display
 
 var canvasSize = 400;
@@ -725,6 +760,7 @@ var tileW = canvasSize / renderW, tileH = canvasSize / renderH;
 var currentSecond = 0, frameCount = 0, framesLastSecond = 0;
 var selectorCoords = { x: null, y: null };
 var playerCoords = { x: null, y: null };
+var combatQueue = [];
 
 var gameMap = [];
 for (var i = 0; i < renderH; i++) {
@@ -736,9 +772,10 @@ for (var i = 0; i < renderH; i++) {
     gameMap.push(row);
 }
 
-placeRectangle({x: 3, y: 5}, {x: 9, y: 13}, "newWallTile");
+placeRectangle({ x: 3, y: 5 }, { x: 9, y: 13 }, "newWallTile");
+fillRectangle({ x: 4, y: 6 }, { x: 8, y: 12 }, "newStoneTile");
 
-gameMap[9][9] = newGrassTile();
+gameMap[9][9] = newStoneTile();
 gameMap[9][9].addContents(new Door(false));
 
 gameMap[20][20].addContents(new Chest());
@@ -746,6 +783,8 @@ gameMap[20][20].addContents(new Chest());
 gameMap[12][12].addContents(playerChar);
 
 playerCoords = { x: 12, y: 12 };
+
+updateHealthDisplay();
 
 // start game on load
 window.onload = function () {
@@ -760,18 +799,33 @@ function newGrassTile() {
 function newWallTile() {
     return new Tile(100, [], "#505050", "Stone Wall");
 }
+function newStoneTile() {
+    return new Tile(1, [], "#A0A0A0", "Stone Floor");
+}
 
-function placeRectangle(corner1, corner2, tileFunction){
+function placeRectangle(corner1, corner2, tileFunction) {
     var lowerX = Math.min(corner1.x, corner2.x);
     var higherX = Math.max(corner1.x, corner2.x);
-    for(var i = lowerX; i <= higherX; i++){
+    for (var i = lowerX; i <= higherX; i++) {
         gameMap[corner1.y][i] = window[tileFunction]();
         gameMap[corner2.y][i] = window[tileFunction]();
     }
     var lowerY = Math.min(corner1.y, corner2.y);
     var higherY = Math.max(corner1.y, corner2.y);
-    for(var i = lowerY + 1; i <= higherY - 1; i++){
+    for (var i = lowerY + 1; i <= higherY - 1; i++) {
         gameMap[i][corner1.x] = window[tileFunction]();
         gameMap[i][corner2.x] = window[tileFunction]()
+    }
+}
+
+function fillRectangle(corner1, corner2, tileFunction) {
+    var lowerX = Math.min(corner1.x, corner2.x);
+    var higherX = Math.max(corner1.x, corner2.x);
+    var lowerY = Math.min(corner1.y, corner2.y);
+    var higherY = Math.max(corner1.y, corner2.y);
+    for (var x = lowerX; x <= higherX; x++) {
+        for (var y = lowerY; y <= higherY; y++) {
+            gameMap[y][x] = window[tileFunction]();
+        }
     }
 }
