@@ -46,6 +46,13 @@ function drawGame() {
             } else {
                 gameMap[playerCoords.y][playerCoords.x].removeContentByType("Player");
                 gameMap[newCoords.y][newCoords.x].addContents(playerChar);
+                if (pointsAreEqual(newCoords, selectorCoords)) {
+                    moveSelector(selectorCoords.x, selectorCoords.y);
+                    gameMap[selectorCoords.y][selectorCoords.x].updateOverride();
+                }
+                if(selectorCoords.x != null && selectorCoords.y != null){
+                    updateSelectorText();
+                }
                 playerCoords = newCoords;
                 playerTookTurn = true;
             }
@@ -80,53 +87,69 @@ canvas.addEventListener('mousedown', function (e) {
     if (squareX == selectorCoords.x && squareY == selectorCoords.y) {
         moveToSelector();
     } else {
-        if (selectorCoords.x != null && selectorCoords != null) {
-            gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
-        }
-        gameMap[squareY][squareX].addContents(new Selector());
-        selectorCoords.x = squareX;
-        selectorCoords.y = squareY;
-        document.getElementById("selected-tile").innerHTML = gameMap[selectorCoords.y][selectorCoords.x].name;
-        var contentString = "";
-        var lootable = false;
-        var hasDoor = false;
-        var isDoorOpen = false;
-        var isDoorLocked = false;
-        var hasCharacter = false;
-        for (var i = 0; i < gameMap[selectorCoords.y][selectorCoords.x].contents.length - 1; i++) {
-            var typeString = gameMap[selectorCoords.y][selectorCoords.x].contents[i].typeString();
-            if (typeString == "Character") hasCharacter = true;
-            if (typeString == "Door") {
-                hasDoor = true;
-                isDoorLocked = gameMap[selectorCoords.y][selectorCoords.x].contents[i].locked;
-                isDoorOpen = !gameMap[selectorCoords.y][selectorCoords.x].contents[i].impassable;
-            }
-            if (gameMap[selectorCoords.y][selectorCoords.x].contents[i].containsLoot) lootable = true;
-            contentString += (typeString == "Character" || typeString == "Player" ? gameMap[selectorCoords.y][selectorCoords.x].contents[i].name : typeString) + "<br/>";
-        }
-        document.getElementById("contents-of-tile").innerHTML = "Contents: <br/>" +
-            (contentString.length == 0 ? "Nothing" : contentString);
-        document.getElementById("actions-tile").innerHTML = "";
-        if (lootable) {
-            document.getElementById("actions-tile").innerHTML += getLootButton();
-        }
-        if (hasDoor) {
-            if (isDoorOpen) {
-                document.getElementById("actions-tile").innerHTML += getCloseButton();
-            } else {
-                if (isDoorLocked) {
-                    document.getElementById("actions-tile").innerHTML += getDisabledOpenButton();
-                } else {
-                    document.getElementById("actions-tile").innerHTML += getOpenButton();
-                }
-            }
-        }
-        if (gameMap[selectorCoords.y][selectorCoords.x].type < 100) {
-            document.getElementById("actions-tile").innerHTML += getMoveButton();
-        }
-        document.getElementById("actions-tile").innerHTML += getDeselectButton();
+        moveSelector(squareX, squareY);
     }
 });
+
+/**
+ * Update left side selector info
+ */
+function updateSelectorText(){
+    document.getElementById("selected-tile").innerHTML = gameMap[selectorCoords.y][selectorCoords.x].name;
+    var contentString = "";
+    var lootable = false;
+    var hasDoor = false;
+    var isDoorOpen = false;
+    var isDoorLocked = false;
+    var hasCharacter = false;
+    for (var i = 0; i < gameMap[selectorCoords.y][selectorCoords.x].contents.length - 1; i++) {
+        var typeString = gameMap[selectorCoords.y][selectorCoords.x].contents[i].typeString();
+        if (typeString == "Character") hasCharacter = true;
+        if (typeString == "Door") {
+            hasDoor = true;
+            isDoorLocked = gameMap[selectorCoords.y][selectorCoords.x].contents[i].locked;
+            isDoorOpen = !gameMap[selectorCoords.y][selectorCoords.x].contents[i].impassable;
+        }
+        if (gameMap[selectorCoords.y][selectorCoords.x].contents[i].containsLoot) lootable = true;
+        contentString += (typeString == "Character" || typeString == "Player" ? gameMap[selectorCoords.y][selectorCoords.x].contents[i].name : typeString) + "<br/>";
+    }
+    document.getElementById("contents-of-tile").innerHTML = "Contents: <br/>" +
+        (contentString.length == 0 ? "Nothing" : contentString);
+    document.getElementById("actions-tile").innerHTML = "";
+    if (lootable) {
+        document.getElementById("actions-tile").innerHTML += getLootButton();
+    }
+    if (hasDoor) {
+        if (isDoorOpen) {
+            document.getElementById("actions-tile").innerHTML += getCloseButton();
+        } else {
+            if (isDoorLocked) {
+                document.getElementById("actions-tile").innerHTML += getDisabledOpenButton();
+            } else {
+                document.getElementById("actions-tile").innerHTML += getOpenButton();
+            }
+        }
+    }
+    if (gameMap[selectorCoords.y][selectorCoords.x].type < 100) {
+        document.getElementById("actions-tile").innerHTML += getMoveButton();
+    }
+    document.getElementById("actions-tile").innerHTML += getDeselectButton();
+}
+
+/**
+ * Move selector
+ * @param int squareX 
+ * @param int squareY 
+ */
+function moveSelector(squareX, squareY) {
+    if (selectorCoords.x != null && selectorCoords != null) {
+        gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
+    }
+    gameMap[squareY][squareX].addContents(new Selector());
+    selectorCoords.x = squareX;
+    selectorCoords.y = squareY;
+    updateSelectorText();
+}
 
 function getMoveButton() {
     return "<button onclick='moveToSelector()' class='mr-2'><i class='fa fa-hiking'></i><br/>Move</button>";
@@ -153,12 +176,14 @@ function getDeselectButton() {
 }
 
 function updateHealthDisplay() {
-    document.getElementById("health-head").innerHTML = "Head: "+playerChar.head +"%";
-    document.getElementById("health-rarm").innerHTML = "Right arm: "+playerChar.rightarm+"%";
-    document.getElementById("health-torso").innerHTML = "Torso: "+playerChar.torso+"%";
-    document.getElementById("health-larm").innerHTML = "Left arm: "+playerChar.leftarm+"%";
-    document.getElementById("health-rleg").innerHTML = "Right leg: "+playerChar.rightleg+"%";
-    document.getElementById("health-lleg").innerHTML = "Left leg: "+playerChar.leftleg+"%";
+    document.getElementById("health-total").innerHTML = "HP: " + playerChar.hp + "/" +playerChar.maxhp;
+    document.getElementById("mana").innerHTML = "MANA: " + playerChar.mana + "/" + playerChar.maxmana;
+    document.getElementById("health-head").innerHTML = "Head: " + playerChar.head + "%";
+    document.getElementById("health-rarm").innerHTML = "Right arm: " + playerChar.rightarm + "%";
+    document.getElementById("health-torso").innerHTML = "Torso: " + playerChar.torso + "%";
+    document.getElementById("health-larm").innerHTML = "Left arm: " + playerChar.leftarm + "%";
+    document.getElementById("health-rleg").innerHTML = "Right leg: " + playerChar.rightleg + "%";
+    document.getElementById("health-lleg").innerHTML = "Left leg: " + playerChar.leftleg + "%";
 }
 
 function openContainer() {
@@ -352,13 +377,19 @@ class Character extends WorldObject {
     gender = 0;
     age = 18;
     mem = 8;
+    
+    maxhp = 1;
+    hp = 1;
+    maxmana = 1;
+    mana = 1;
+
     con = 7; // constitution - HP
     str = 7; // strength - physical damage
     dex = 7; // dexterity - dodge/hit chance
     int = 7; // intelligence - magical damage
     arm = 7; // armor - physical resistance
     wil = 7; // willpower - magical resistance
-    
+
     status = 0;
     head = 100;
     torso = 100;
@@ -380,6 +411,13 @@ class Character extends WorldObject {
         this.int = Math.max(races[this.race][1][3] + childStory[this.backstory[0]][1][3] + adultStory[this.backstory[1]][1][3], 0);
         this.arm = Math.max(races[this.race][1][4] + childStory[this.backstory[0]][1][4] + adultStory[this.backstory[1]][1][4], 0);
         this.wil = Math.max(races[this.race][1][5] + childStory[this.backstory[0]][1][5] + adultStory[this.backstory[1]][1][5], 0);
+        
+        this.maxhp = (this.con * 5) + Math.floor(Math.pow(2, this.con/4));
+        this.hp = this.maxhp;
+
+        this.maxmana = Math.floor(5 + (this.int / 2) + (this.wil / 2) + (this.age / 20));
+        this.mana = this.maxmana;
+
         this.gender = Math.floor(Math.random() * 2);
         this.name = generateName(this.gender) + " " + generateName(2);
     }
@@ -391,7 +429,7 @@ class Character extends WorldObject {
 
 class Enemy extends Character {
 
-    typeString(){
+    typeString() {
         return "Enemy";
     }
 }
@@ -402,7 +440,7 @@ class Corpse extends Character {
         this.containsLoot = true;
     }
 
-    typeString(){
+    typeString() {
         return "Corpse";
     }
 }
@@ -781,6 +819,7 @@ gameMap[9][9].addContents(new Door(false));
 gameMap[20][20].addContents(new Chest());
 
 gameMap[12][12].addContents(playerChar);
+fillRectangle({x:20, y:2}, {x:23, y: 5}, "newOceanTile");
 
 playerCoords = { x: 12, y: 12 };
 
@@ -794,13 +833,16 @@ window.onload = function () {
 }
 
 function newGrassTile() {
-    return new Tile(0, [], "#03A313", "Grass");
+    return new Tile(0, [], "#6AA323", "Grass");
 }
 function newWallTile() {
     return new Tile(100, [], "#505050", "Stone Wall");
 }
 function newStoneTile() {
     return new Tile(1, [], "#A0A0A0", "Stone Floor");
+}
+function newOceanTile() {
+    return new Tile(101, [], "#5050BB", "Ocean")
 }
 
 function placeRectangle(corner1, corner2, tileFunction) {
