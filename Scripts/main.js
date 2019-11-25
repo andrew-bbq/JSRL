@@ -33,11 +33,11 @@ function drawGame() {
             if (Array.isArray(newCoords)) {
                 var coordsToActOn = newCoords[1];
                 switch (newCoords[0]) {
-                    case LOOT:
+                    case ACTION_LOOT:
                         // looting does not take up an action so do not set playerTookTurn to true
                         openContainer(coordsToActOn);
                         break;
-                    case OPEN:
+                    case ACTION_OPEN:
                         gameMap[coordsToActOn.y][coordsToActOn.x].getFirstContentByType("Door").toggleOpen();
                         gameMap[coordsToActOn.y][coordsToActOn.x].updateOverride();
                         playerTookTurn = true;
@@ -50,7 +50,7 @@ function drawGame() {
                     moveSelector(selectorCoords.x, selectorCoords.y);
                     gameMap[selectorCoords.y][selectorCoords.x].updateOverride();
                 }
-                if(selectorCoords.x != null && selectorCoords.y != null){
+                if (selectorCoords.x != null && selectorCoords.y != null) {
                     updateSelectorText();
                 }
                 playerCoords = newCoords;
@@ -94,7 +94,7 @@ canvas.addEventListener('mousedown', function (e) {
 /**
  * Update left side selector info
  */
-function updateSelectorText(){
+function updateSelectorText() {
     document.getElementById("selected-tile").innerHTML = gameMap[selectorCoords.y][selectorCoords.x].name;
     var contentString = "";
     var lootable = false;
@@ -176,7 +176,7 @@ function getDeselectButton() {
 }
 
 function updateHealthDisplay() {
-    document.getElementById("health-total").innerHTML = "HP: " + playerChar.hp + "/" +playerChar.maxhp;
+    document.getElementById("health-total").innerHTML = "HP: " + playerChar.hp + "/" + playerChar.maxhp;
     document.getElementById("mana").innerHTML = "MANA: " + playerChar.mana + "/" + playerChar.maxmana;
     document.getElementById("health-head").innerHTML = "Head: " + playerChar.head + "%";
     document.getElementById("health-rarm").innerHTML = "Right arm: " + playerChar.rightarm + "%";
@@ -184,6 +184,18 @@ function updateHealthDisplay() {
     document.getElementById("health-larm").innerHTML = "Left arm: " + playerChar.leftarm + "%";
     document.getElementById("health-rleg").innerHTML = "Right leg: " + playerChar.rightleg + "%";
     document.getElementById("health-lleg").innerHTML = "Left leg: " + playerChar.leftleg + "%";
+}
+
+function updateInventoryDisplay() {
+    var inv = document.getElementById("player-inventory");
+    inv.innerHTML = "";
+    for (var i = 0; i < playerChar.inventory.length; i++) {
+        inv.innerHTML += getObjectButton(playerChar.inventory[i], i);
+    }
+}
+
+function getObjectButton(invObject, index) {
+    return "<img class='hover-pointer mr-1 mt-1' onclick='getObjectOptions(" + index + ")' src='" + invObject.imageURL + "' style='border:3px solid black' />";
 }
 
 function openContainer() {
@@ -219,7 +231,7 @@ function moveToSelector() {
 function moveAndLootSelector() {
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
-    playerChar.moveQueue.push([LOOT, { x: selectorCoords.x, y: selectorCoords.y }]);
+    playerChar.moveQueue.push([ACTION_LOOT, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
 }
 
@@ -249,9 +261,6 @@ const skills = {
     axe: [],
     spear: [],
     bow: [],
-    rifle: [],
-    handgun: [],
-    shotgun: [],
     fire: [],
     water: [],
     air: [],
@@ -313,6 +322,44 @@ const adultStory = [
     ["Janitor", [3, 0, 0, -4, 2, 2]],
     ["Warrior", [2, 2, 2, -5, 2, -5]],
 ];
+
+class InventoryObject {
+    name = "";
+    rarity = RARITY_COMMON;
+    isArmor = false;
+    flavorText = "";
+    imageURL = "none.png"
+
+    constructor(name, rarity, isArmor, flavorText, imageURL) {
+        this.name = name;
+        this.rarity = rarity;
+        this.isArmor = isArmor;
+        this.flavorText = flavorText;
+        this.imageURL = imageURL;
+    }
+
+    typeString() {
+        return "InventoryObject";
+    }
+}
+
+class Equip extends InventoryObject {
+    armorType = ARMOR_UNDEFINED;
+    stats = [0, 0, 0, 0, 0, 0];
+
+    // damage and range if this is a weapon
+    damage = 0;
+    range = 1;
+
+    constructor(name, rarity, armorType) {
+        super(name, rarity, true);
+        this.armorType = armorType;
+    }
+
+    typeString() {
+        return "Equip";
+    }
+}
 
 class WorldObject {
     priority = 0;
@@ -377,7 +424,7 @@ class Character extends WorldObject {
     gender = 0;
     age = 18;
     mem = 8;
-    
+
     maxhp = 1;
     hp = 1;
     maxmana = 1;
@@ -399,6 +446,9 @@ class Character extends WorldObject {
     rightleg = 100;
     race = 0;
     backstory = [0, 0];
+
+    inventory = [];
+
     constructor() {
         super(1000, "#AA00AA", false, false, true);
         this.backstory = [Math.floor(Math.random() * childStory.length), Math.floor(Math.random() * adultStory.length)];
@@ -411,8 +461,8 @@ class Character extends WorldObject {
         this.int = Math.max(races[this.race][1][3] + childStory[this.backstory[0]][1][3] + adultStory[this.backstory[1]][1][3], 0);
         this.arm = Math.max(races[this.race][1][4] + childStory[this.backstory[0]][1][4] + adultStory[this.backstory[1]][1][4], 0);
         this.wil = Math.max(races[this.race][1][5] + childStory[this.backstory[0]][1][5] + adultStory[this.backstory[1]][1][5], 0);
-        
-        this.maxhp = (this.con * 5) + Math.floor(Math.pow(2, this.con/4));
+
+        this.maxhp = (this.con * 5) + Math.floor(Math.pow(2, this.con / 4));
         this.hp = this.maxhp;
 
         this.maxmana = Math.floor(5 + (this.int / 2) + (this.wil / 2) + (this.age / 20));
@@ -435,9 +485,14 @@ class Enemy extends Character {
 }
 
 class Corpse extends Character {
-    constructor() {
+    constructor(name, age, gender, race, inventory) {
         super();
         this.containsLoot = true;
+        this.name = name;
+        this.age = age;
+        this.gender = gender;
+        this.race = race;
+        this.inventory = inventory;
     }
 
     typeString() {
@@ -749,6 +804,10 @@ function getShortestPath(point1, point2, returnType) {
             return minPaths[point2.y][point2.x];
         case DIST:
             return dist[point2.y][point2.x];
+        case ALL_PATHs:
+            return minPaths;
+        case ALL_DISTS:
+            return dist;
     }
 
 }
@@ -769,26 +828,43 @@ document.getElementById("player-mem").innerHTML = "MEM: " + playerChar.mem;
 var ctx = null;
 
 // constant values for directions in generating the map
-const N = 1;
-const E = 2;
-const S = 4;
-const W = 8;
+const DIR_N = 1;
+const DIR_E = 2;
+const DIR_S = 4;
+const DIR_W = 8;
 
 // constant values for getShortestDistance
 const PATH = 0;
 const DIST = 1;
+const ALL_PATHS = 2;
+const ALL_DISTS = 4;
 
 // constant values for actions in Player.moveQueue
-const LOOT = 0;
-const OPEN = 1;
+const ACTION_LOOT = 0;
+const ACTION_OPEN = 1;
 
 // constant values for equipment
-const HELMET = 0;
-const TORSO = 1;
-const TWOHAND = 2;
-const ONEHAND = 4;
-const PANTS = 8;
-const RING = 16;
+const ARMOR_UNDEFINED = -1;
+const ARMOR_HELMET = 0;
+const ARMOR_TORSO = 1;
+const ARMOR_TWOHAND = 2;
+const ARMOR_ONEHAND = 4;
+const ARMOR_PANTS = 8;
+const ARMOR_RING = 16;
+
+// constant values for InventoryObject rarities
+const RARITY_COMMON = 0;
+const RARITY_UNCOMMON = 1;
+const RARITY_RARE = 2;
+const RARITY_EPIC = 4;
+const RARITY_LEGENDARY = 8;
+const RARITY_COLORS = {
+    RARITY_COMMON: "#FFFFFF",
+    RARITY_UNCOMMON: "#28DE3D",
+    RARITY_RARE: "#00D0FF",
+    RARITY_EPIC: "#D400FF",
+    RARITY_LEGENDARY: "#FF5500",
+}
 
 // tile width, height, map width, height, and frame information for display
 
@@ -819,7 +895,7 @@ gameMap[9][9].addContents(new Door(false));
 gameMap[20][20].addContents(new Chest());
 
 gameMap[12][12].addContents(playerChar);
-fillRectangle({x:20, y:2}, {x:23, y: 5}, "newOceanTile");
+fillRectangle({ x: 20, y: 2 }, { x: 23, y: 5 }, "newOceanTile");
 
 playerCoords = { x: 12, y: 12 };
 
@@ -871,3 +947,10 @@ function fillRectangle(corner1, corner2, tileFunction) {
         }
     }
 }
+
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
+updateInventoryDisplay();
