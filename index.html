@@ -16,7 +16,17 @@
             </div>
         </div>
         <div class="row">
-            <div class="col-sm-3">
+            <div id="equip-info" style="display: none;" class="col-sm-3">
+                <div class="row text-center pt-3">
+                    <h2>Equipment</h2>
+                </div>
+            </div>
+            <div id="item-info" style="display: none;" class="col-sm-3">
+                <div class="row text-center pt-3">
+                    <h2 id="item-name"></h2>
+                </div>
+            </div>
+            <div id="tile-info" class="col-sm-3">
                 <div class="row text-center pt-3">
                     <h2 id="selected-tile">No tile selected</h2>
                 </div>
@@ -83,11 +93,16 @@
                 </div>
             </div>
             <div class="col-sm-4 text-center">
-                <div class="row"><h3>Inventory</h3></div>
+                <div class="row">
+                    <h3>Inventory</h3>
+                </div>
                 <div class="row" id="player-inventory"></div>
             </div>
-            <div class="col-sm-4 text-center">
-                <h3>Container</h3>
+            <div id="alternate-inventory" style="display: none;" class="col-sm-4 text-center">
+                <div class="row">
+                    <h3>Container</h3>
+                </div>
+                <div class="row" id="container-inventory"></div>
             </div>
         </div>
     </div>

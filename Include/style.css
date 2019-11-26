@@ -1,3 +1,32 @@
 .hover-pointer {
     cursor: pointer;
 }
+
+.object-border {
+    border-style: solid;
+}
+
+.rarity-common {
+    color: #888888;;
+    border-color: #888888;
+}
+
+.rarity-uncommon {
+    color: #28DE3D;
+    border-color: #28DE3D;
+}
+
+.rarity-rare {
+    color: #00D0FF;
+    border-color: #00D0FF;
+}
+
+.rarity-epic {
+    color: #D400FF;
+    border-color: #D400FF;
+}
+
+.rarity-legendary {
+    color: #FF5500;
+    border-color: #FF5500;
+}

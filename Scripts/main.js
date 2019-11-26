@@ -87,6 +87,7 @@ canvas.addEventListener('mousedown', function (e) {
     if (squareX == selectorCoords.x && squareY == selectorCoords.y) {
         moveToSelector();
     } else {
+        toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
     }
 });
@@ -156,7 +157,7 @@ function getMoveButton() {
 }
 
 function getLootButton() {
-    return "<button onclick='moveAndLootSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
+    return "<button onclick='moveAndLootImpassableSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
 }
 
 function getOpenButton() {
@@ -195,17 +196,50 @@ function updateInventoryDisplay() {
 }
 
 function getObjectButton(invObject, index) {
-    return "<img class='hover-pointer mr-1 mt-1' onclick='getObjectOptions(" + index + ")' src='" + invObject.imageURL + "' style='border:3px solid black' />";
+    return "<img class='hover-pointer mr-1 mt-1 object-border "+RARITY_CLASSES[invObject.rarity]+"' onclick='getObjectOptions(" + index + ")' src='" + invObject.imageURL + "' />";
 }
 
-function openContainer() {
+function getObjectOptions(index){
+    var item = playerChar.inventory[index];
+    document.getElementById("item-name").innerHTML = item.name;
+    document.getElementById("item-name").classList = [RARITY_CLASSES[item.rarity]];
+    toggleUI(UI_ITEM);
+}
 
+function openContainer(coords) {
+    document.getElementById("alternate-inventory").style.display = "block";
+    var inv = document.getElementById("container-inventory");
+    var container = gameMap[coords.y][coords.x].getFirstLootableObject();
+    for (var i = 0; i < container.inventory.length; i++) {
+        inv.innerHTML += getContainerObjectButton(container.inventory[i], i, coords);
+    }
+}
+
+function getContainerObjectButton(invObject, index, coords){
+    return "<img class='hover-pointer mr-1 mt-1' onclick='getContainerObjectOptions(" + index + ", {x: " + coords.x +", y: "+ coords.y + "})' src='" + invObject.imageURL + "' style='border:3px solid black' />";
+}
+
+function toggleUI(toDisplay){
+    document.getElementById("tile-info").style.display = "none";
+    document.getElementById("equip-info").style.display = "none";
+    document.getElementById("item-info").style.display = "none";
+    switch(toDisplay){
+        case UI_EQUIP:
+            document.getElementById("equip-info").style.display = "block";
+            break;
+        case UI_ITEM:
+            document.getElementById("item-info").style.display = "block";
+            break;
+        case UI_TILE:
+            document.getElementById("tile-info").style.display = "block";
+            break;
+    }
 }
 
 function moveAndToggleDoor() {
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
-    playerChar.moveQueue.push([OPEN, { x: selectorCoords.x, y: selectorCoords.y }]);
+    playerChar.moveQueue.push([ACTION_OPEN, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
 }
 
@@ -228,9 +262,15 @@ function moveToSelector() {
     selectorCoords.y = null;
 }
 
-function moveAndLootSelector() {
+function moveAndLootImpassableSelector() {
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
+    playerChar.moveQueue.push([ACTION_LOOT, { x: selectorCoords.x, y: selectorCoords.y }]);
+    removeSelector();
+}
+
+function moveAndLootSelector(){
+    playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH);
     playerChar.moveQueue.push([ACTION_LOOT, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
 }
@@ -250,10 +290,6 @@ function getAdjacentPointClosestToPlayer(point) {
     } else {
         return playerCoords;
     }
-}
-
-function getDistance(point1, point2) {
-    return Math.sqrt(Math.pow(point1.x - point2.x, 2) + (Math.pow(point1.y - point2.y, 2)));
 }
 
 const skills = {
@@ -381,8 +417,11 @@ class WorldObject {
 }
 
 class Chest extends WorldObject {
-    constructor() {
+    inventory = [];
+
+    constructor(inventory) {
         super(1, "#BBAA10", false, true, true)
+        this.inventory = inventory;
     }
 
     typeString() {
@@ -589,6 +628,15 @@ class Tile {
     getFirstContentByType(toFind) {
         for (var i = 0; i < this.contents.length; i++) {
             if (this.contents[i].typeString() == toFind) {
+                return this.contents[i];
+            }
+        }
+        return false;
+    }
+
+    getFirstLootableObject(){
+        for (var i = 0; i < this.contents.length; i++){
+            if (this.contents[i].containsLoot){
                 return this.contents[i];
             }
         }
@@ -858,13 +906,24 @@ const RARITY_UNCOMMON = 1;
 const RARITY_RARE = 2;
 const RARITY_EPIC = 4;
 const RARITY_LEGENDARY = 8;
-const RARITY_COLORS = {
-    RARITY_COMMON: "#FFFFFF",
-    RARITY_UNCOMMON: "#28DE3D",
-    RARITY_RARE: "#00D0FF",
-    RARITY_EPIC: "#D400FF",
-    RARITY_LEGENDARY: "#FF5500",
-}
+const RARITY_COLORS = {};
+RARITY_COLORS[RARITY_COMMON] = "#FFFFFF";
+RARITY_COLORS[RARITY_UNCOMMON] = "#28DE3D";
+RARITY_COLORS[RARITY_RARE] = "#00D0FF";
+RARITY_COLORS[RARITY_EPIC] = "#D400FF";
+RARITY_COLORS[RARITY_LEGENDARY] = "#FF5500";
+
+const RARITY_CLASSES = {};
+RARITY_CLASSES[RARITY_COMMON] = "rarity-common";
+RARITY_CLASSES[RARITY_UNCOMMON] = "rarity-uncommon";
+RARITY_CLASSES[RARITY_RARE] = "rarity-rare";
+RARITY_CLASSES[RARITY_EPIC] = "rarity-epic";
+RARITY_CLASSES[RARITY_LEGENDARY] = "rarity-legendary";
+
+// constant values for toggling the left-most display
+const UI_TILE = 0;
+const UI_EQUIP = 1;
+const UI_ITEM = 2;
 
 // tile width, height, map width, height, and frame information for display
 
@@ -892,7 +951,8 @@ fillRectangle({ x: 4, y: 6 }, { x: 8, y: 12 }, "newStoneTile");
 gameMap[9][9] = newStoneTile();
 gameMap[9][9].addContents(new Door(false));
 
-gameMap[20][20].addContents(new Chest());
+gameMap[20][20].addContents(new Chest([]));
+gameMap[20][20].getFirstLootableObject().inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Hello", "Images/none.png"));
 
 gameMap[12][12].addContents(playerChar);
 fillRectangle({ x: 20, y: 2 }, { x: 23, y: 5 }, "newOceanTile");
@@ -949,8 +1009,8 @@ function fillRectangle(corner1, corner2, tileFunction) {
 }
 
 playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_UNCOMMON, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_RARE, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_EPIC, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_LEGENDARY, false, "Flavorful", "Images/none.png"));
 updateInventoryDisplay();
