@@ -96,45 +96,52 @@ canvas.addEventListener('mousedown', function (e) {
  * Update left side selector info
  */
 function updateSelectorText() {
-    document.getElementById("selected-tile").innerHTML = gameMap[selectorCoords.y][selectorCoords.x].name;
-    var contentString = "";
-    var lootable = false;
-    var hasDoor = false;
-    var isDoorOpen = false;
-    var isDoorLocked = false;
-    var hasCharacter = false;
-    for (var i = 0; i < gameMap[selectorCoords.y][selectorCoords.x].contents.length - 1; i++) {
-        var typeString = gameMap[selectorCoords.y][selectorCoords.x].contents[i].typeString();
-        if (typeString == "Character") hasCharacter = true;
-        if (typeString == "Door") {
-            hasDoor = true;
-            isDoorLocked = gameMap[selectorCoords.y][selectorCoords.x].contents[i].locked;
-            isDoorOpen = !gameMap[selectorCoords.y][selectorCoords.x].contents[i].impassable;
+    if (selectorCoords.x != null && selectorCoords.y != null) {
+        document.getElementById("selected-tile").innerHTML = gameMap[selectorCoords.y][selectorCoords.x].name;
+        var contentString = "";
+        var lootable = false;
+        var hasDoor = false;
+        var isDoorOpen = false;
+        var isDoorLocked = false;
+        var isImpassable = false // is impassable handled differently from isDoorLocked in case non-door item is impassable
+        var hasCharacter = false;
+        for (var i = 0; i < gameMap[selectorCoords.y][selectorCoords.x].contents.length - 1; i++) {
+            var typeString = gameMap[selectorCoords.y][selectorCoords.x].contents[i].typeString();
+            if (typeString == "Character") hasCharacter = true;
+            if (typeString == "Door") {
+                hasDoor = true;
+                isDoorLocked = gameMap[selectorCoords.y][selectorCoords.x].contents[i].locked;
+                isDoorOpen = !gameMap[selectorCoords.y][selectorCoords.x].contents[i].impassable;
+            }
+            if (gameMap[selectorCoords.y][selectorCoords.x].contents[i].containsLoot) lootable = true;
+            if (gameMap[selectorCoords.y][selectorCoords.x].contents[i].impassable && typeString != "Player") isImpassable = true;
+            contentString += (typeString == "Character" || typeString == "Player" ? gameMap[selectorCoords.y][selectorCoords.x].contents[i].name : typeString) + "<br/>";
         }
-        if (gameMap[selectorCoords.y][selectorCoords.x].contents[i].containsLoot) lootable = true;
-        contentString += (typeString == "Character" || typeString == "Player" ? gameMap[selectorCoords.y][selectorCoords.x].contents[i].name : typeString) + "<br/>";
-    }
-    document.getElementById("contents-of-tile").innerHTML = "Contents: <br/>" +
-        (contentString.length == 0 ? "Nothing" : contentString);
-    document.getElementById("actions-tile").innerHTML = "";
-    if (lootable) {
-        document.getElementById("actions-tile").innerHTML += getLootButton();
-    }
-    if (hasDoor) {
-        if (isDoorOpen) {
-            document.getElementById("actions-tile").innerHTML += getCloseButton();
-        } else {
-            if (isDoorLocked) {
-                document.getElementById("actions-tile").innerHTML += getDisabledOpenButton();
+        document.getElementById("contents-of-tile").innerHTML = "Contents: <br/>" +
+            (contentString.length == 0 ? "Nothing" : contentString);
+        document.getElementById("actions-tile").innerHTML = "";
+        if (lootable && isImpassable) {
+            document.getElementById("actions-tile").innerHTML += getLootButton();
+        }
+        if (lootable && !isImpassable) {
+            document.getElementById("actions-tile").innerHTML += getLootExactButton();
+        }
+        if (hasDoor) {
+            if (isDoorOpen) {
+                document.getElementById("actions-tile").innerHTML += getCloseButton();
             } else {
-                document.getElementById("actions-tile").innerHTML += getOpenButton();
+                if (isDoorLocked) {
+                    document.getElementById("actions-tile").innerHTML += getDisabledOpenButton();
+                } else {
+                    document.getElementById("actions-tile").innerHTML += getOpenButton();
+                }
             }
         }
+        if (gameMap[selectorCoords.y][selectorCoords.x].type < 100) {
+            document.getElementById("actions-tile").innerHTML += getMoveButton();
+        }
+        document.getElementById("actions-tile").innerHTML += getDeselectButton();
     }
-    if (gameMap[selectorCoords.y][selectorCoords.x].type < 100) {
-        document.getElementById("actions-tile").innerHTML += getMoveButton();
-    }
-    document.getElementById("actions-tile").innerHTML += getDeselectButton();
 }
 
 /**
@@ -158,6 +165,10 @@ function getMoveButton() {
 
 function getLootButton() {
     return "<button onclick='moveAndLootImpassableSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
+}
+
+function getLootExactButton() {
+    return "<button onclick='moveAndLootSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
 }
 
 function getOpenButton() {
@@ -196,34 +207,69 @@ function updateInventoryDisplay() {
 }
 
 function getObjectButton(invObject, index) {
-    return "<img class='hover-pointer mr-1 mt-1 object-border "+RARITY_CLASSES[invObject.rarity]+"' onclick='getObjectOptions(" + index + ")' src='" + invObject.imageURL + "' />";
+    return "<img class='hover-pointer mr-1 mt-1 object-border " + RARITY_CLASSES[invObject.rarity] + "' onclick='getObjectOptions(" + index + ")' src='" + invObject.imageURL + "' />";
 }
 
-function getObjectOptions(index){
+function getContainerObjectButton(invObject, index, coords) {
+    return "<img class='hover-pointer mr-1 mt-1 object-border " + RARITY_CLASSES[invObject.rarity] + "' onclick='getContainerObjectOptions(" + index + ", {x: " + coords.x + ", y: " + coords.y + "})' src='" + invObject.imageURL + "' />";
+}
+
+function getObjectOptions(index) {
     var item = playerChar.inventory[index];
     document.getElementById("item-name").innerHTML = item.name;
     document.getElementById("item-name").classList = [RARITY_CLASSES[item.rarity]];
+    document.getElementById("item-flavor-text").innerHTML = item.flavorText;
+    document.getElementById("item-actions").innerHTML = "";
+    if (playerChar.inventory[index].isArmor) {
+        document.getElementById("item-actions").innerHTML += getEquipButton(index);
+    }
+    document.getElementById("item-actions").innerHTML += getDropButton(index);
     toggleUI(UI_ITEM);
 }
 
+function getEquipButton(index) {
+    return "<button onclick='equipItem(" + index + ")' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip</button>";
+}
+
+function getDropButton(index) {
+    return "<button onclick='dropItem(" + index + ")' class='mr-2'><i class='fas fa-arrow-down'></i><br/>Drop</button>";
+}
+
+function equipItem(index) {
+    //TODO
+}
+
+function dropItem(index) {
+    if (gameMap[playerCoords.y][playerCoords.x].containsContentByType("Dropped Items")) {
+        console.log(gameMap[playerCoords.y][playerCoords.x].getFirstContentByType("Dropped Items"));
+        gameMap[playerCoords.y][playerCoords.x].getFirstContentByType("Dropped Items").inventory.push(playerChar.inventory[index]);
+        playerChar.inventory.splice(index, 1);
+    } else {
+        gameMap[playerCoords.y][playerCoords.x].addContents(new DroppedItems([playerChar.inventory[index]]));
+        playerChar.inventory.splice(index, 1);
+    }
+    updateInventoryDisplay();
+    updateSelectorText();
+    toggleUI(UI_TILE);
+    toggleContainerUI(RUI_NONE);
+}
+
 function openContainer(coords) {
-    document.getElementById("alternate-inventory").style.display = "block";
+    toggleContainerUI(RUI_LOOT);
     var inv = document.getElementById("container-inventory");
+    inv.innerHTML = "";
     var container = gameMap[coords.y][coords.x].getFirstLootableObject();
+    document.getElementById("container-type").innerHTML = container.typeString();
     for (var i = 0; i < container.inventory.length; i++) {
         inv.innerHTML += getContainerObjectButton(container.inventory[i], i, coords);
     }
 }
 
-function getContainerObjectButton(invObject, index, coords){
-    return "<img class='hover-pointer mr-1 mt-1' onclick='getContainerObjectOptions(" + index + ", {x: " + coords.x +", y: "+ coords.y + "})' src='" + invObject.imageURL + "' style='border:3px solid black' />";
-}
-
-function toggleUI(toDisplay){
+function toggleUI(toDisplay) {
     document.getElementById("tile-info").style.display = "none";
     document.getElementById("equip-info").style.display = "none";
     document.getElementById("item-info").style.display = "none";
-    switch(toDisplay){
+    switch (toDisplay) {
         case UI_EQUIP:
             document.getElementById("equip-info").style.display = "block";
             break;
@@ -233,10 +279,24 @@ function toggleUI(toDisplay){
         case UI_TILE:
             document.getElementById("tile-info").style.display = "block";
             break;
+        default:
+            break;
+    }
+}
+
+function toggleContainerUI(toDisplay) {
+    document.getElementById("alternate-inventory").style.display = "none";
+    switch (toDisplay) {
+        case RUI_LOOT:
+            document.getElementById("alternate-inventory").style.display = "block";
+            break;
+        default:
+            break;
     }
 }
 
 function moveAndToggleDoor() {
+    toggleContainerUI(RUI_NONE);
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
     playerChar.moveQueue.push([ACTION_OPEN, { x: selectorCoords.x, y: selectorCoords.y }]);
@@ -253,6 +313,7 @@ function removeSelector() {
 }
 
 function moveToSelector() {
+    toggleContainerUI(RUI_NONE);
     playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH);
     gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
     document.getElementById("selected-tile").innerHTML = "No tile selected";
@@ -263,13 +324,15 @@ function moveToSelector() {
 }
 
 function moveAndLootImpassableSelector() {
+    toggleContainerUI(RUI_NONE);
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
     playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
     playerChar.moveQueue.push([ACTION_LOOT, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
 }
 
-function moveAndLootSelector(){
+function moveAndLootSelector() {
+    toggleContainerUI(RUI_NONE);
     playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH);
     playerChar.moveQueue.push([ACTION_LOOT, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
@@ -387,8 +450,8 @@ class Equip extends InventoryObject {
     damage = 0;
     range = 1;
 
-    constructor(name, rarity, armorType) {
-        super(name, rarity, true);
+    constructor(name, rarity, armorType, flavorText, imageURL) {
+        super(name, rarity, true, flavorText, imageURL);
         this.armorType = armorType;
     }
 
@@ -426,6 +489,18 @@ class Chest extends WorldObject {
 
     typeString() {
         return "Chest";
+    }
+}
+
+class DroppedItems extends WorldObject {
+    inventory = [];
+    constructor(inventory) {
+        super(1, "#855510", false, true, false);
+        this.inventory = inventory;
+    }
+
+    typeString() {
+        return "Dropped Items";
     }
 }
 
@@ -616,7 +691,7 @@ class Tile {
         this.updateOverride();
     }
 
-    includesContentByType(toFind) {
+    containsContentByType(toFind) {
         for (var i = 0; i < this.contents.length; i++) {
             if (this.contents[i].typeString() == toFind) {
                 return true;
@@ -634,9 +709,9 @@ class Tile {
         return false;
     }
 
-    getFirstLootableObject(){
-        for (var i = 0; i < this.contents.length; i++){
-            if (this.contents[i].containsLoot){
+    getFirstLootableObject() {
+        for (var i = 0; i < this.contents.length; i++) {
+            if (this.contents[i].containsLoot) {
                 return this.contents[i];
             }
         }
@@ -921,9 +996,14 @@ RARITY_CLASSES[RARITY_EPIC] = "rarity-epic";
 RARITY_CLASSES[RARITY_LEGENDARY] = "rarity-legendary";
 
 // constant values for toggling the left-most display
-const UI_TILE = 0;
+const UI_NONE = 0;
 const UI_EQUIP = 1;
 const UI_ITEM = 2;
+const UI_TILE = 4;
+
+// constant values for toggling the bottom-right display
+const RUI_NONE = 0;
+const RUI_LOOT = 1;
 
 // tile width, height, map width, height, and frame information for display
 
@@ -1013,4 +1093,7 @@ playerChar.inventory.push(new InventoryObject("Test Object", RARITY_UNCOMMON, fa
 playerChar.inventory.push(new InventoryObject("Test Object", RARITY_RARE, false, "Flavorful", "Images/none.png"));
 playerChar.inventory.push(new InventoryObject("Test Object", RARITY_EPIC, false, "Flavorful", "Images/none.png"));
 playerChar.inventory.push(new InventoryObject("Test Object", RARITY_LEGENDARY, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new Equip("Sword of the Stinky", RARITY_EPIC, ARMOR_ONEHAND, "The stinkiest sword to ever grace humanity", "Images/none.png"));
+playerChar.inventory.push(new InventoryObject("Test Object", RARITY_LEGENDARY, false, "Flavorful", "Images/none.png"));
+
 updateInventoryDisplay();
