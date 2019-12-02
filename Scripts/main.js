@@ -1,3 +1,61 @@
+// constant values for directions in generating the map
+const DIR_N = 1;
+const DIR_E = 2;
+const DIR_S = 4;
+const DIR_W = 8;
+
+// constant values for getShortestDistance
+const PATH = 0;
+const DIST = 1;
+const ALL_PATHS = 2;
+const ALL_DISTS = 4;
+
+// constant values for actions in Player.moveQueue
+const ACTION_LOOT = 0;
+const ACTION_OPEN = 1;
+
+// constant values for equipment
+const ARMOR_UNDEFINED = -1;
+const ARMOR_HELMET = 0;
+const ARMOR_TORSO = 1;
+const ARMOR_TWOHAND = 2;
+const ARMOR_ONEHAND = 4;
+const ARMOR_PANTS = 8;
+const ARMOR_RING = 16;
+// not armor types, but used for equipping
+const ARMOR_RIGHTHAND = 32;
+const ARMOR_LEFTHAND = 64
+
+// constant values for InventoryObject rarities
+const RARITY_COMMON = 0;
+const RARITY_UNCOMMON = 1;
+const RARITY_RARE = 2;
+const RARITY_EPIC = 4;
+const RARITY_LEGENDARY = 8;
+const RARITY_COLORS = {};
+RARITY_COLORS[RARITY_COMMON] = "#FFFFFF";
+RARITY_COLORS[RARITY_UNCOMMON] = "#28DE3D";
+RARITY_COLORS[RARITY_RARE] = "#00D0FF";
+RARITY_COLORS[RARITY_EPIC] = "#D400FF";
+RARITY_COLORS[RARITY_LEGENDARY] = "#FF5500";
+
+const RARITY_CLASSES = {};
+RARITY_CLASSES[RARITY_COMMON] = "rarity-common";
+RARITY_CLASSES[RARITY_UNCOMMON] = "rarity-uncommon";
+RARITY_CLASSES[RARITY_RARE] = "rarity-rare";
+RARITY_CLASSES[RARITY_EPIC] = "rarity-epic";
+RARITY_CLASSES[RARITY_LEGENDARY] = "rarity-legendary";
+
+// constant values for toggling the left-most display
+const UI_NONE = 0;
+const UI_EQUIP = 1;
+const UI_ITEM = 2;
+const UI_TILE = 4;
+
+// constant values for toggling the bottom-right display
+const RUI_NONE = 0;
+const RUI_LOOT = 1;
+
 var tick = 0;
 var gameSpeed = 6;
 var playerTookTurn = false;
@@ -221,37 +279,255 @@ function getObjectOptions(index) {
     document.getElementById("item-flavor-text").innerHTML = item.flavorText;
     document.getElementById("item-actions").innerHTML = "";
     if (playerChar.inventory[index].isArmor) {
-        document.getElementById("item-actions").innerHTML += getEquipButton(index);
+        if (playerChar.inventory[index].armorType == ARMOR_ONEHAND) {
+            document.getElementById("item-actions").innerHTML += getEquipOneHandButton(index);
+        } else if(playerChar.inventory[index].armorType == ARMOR_TWOHAND) {
+            document.getElementById("item-actions").innerHTML += getEquipTwoHandButton(index);
+        } else {
+            document.getElementById("item-actions").innerHTML += getEquipButton(index);
+        }
     }
     document.getElementById("item-actions").innerHTML += getDropButton(index);
     toggleUI(UI_ITEM);
 }
 
+function getContainerObjectOptions(index, coords) {
+    var item = gameMap[coords.y][coords.x].getFirstLootableObject().inventory[index];
+    document.getElementById("item-name").innerHTML = item.name;
+    document.getElementById("item-name").classList = [RARITY_CLASSES[item.rarity]];
+    document.getElementById("item-flavor-text").innerHTML = item.flavorText;
+    document.getElementById("item-actions").innerHTML = "";
+    if (item.isArmor) {
+        if (item.armorType == ARMOR_ONEHAND){
+            document.getElementById("item-actions").innerHTML += getEquipOneHandFCButton(index, coords);
+        } else if (item.armorType == ARMOR_TWOHAND) {
+            document.getElementById("item-actions").innerHTML += getEquipTwoHandFCButton(index, coords);
+        } else {
+            document.getElementById("item-actions").innerHTML += getEquipFCButton(index, coords);
+        }
+    }
+    document.getElementById("item-actions").innerHTML += getPickupButton(index, coords);
+    toggleUI(UI_ITEM);
+}
+
+// could probably consolidate into a single getEquipButton with a function name, hand index, and button text field, 
+// but then that would move work up into the code above and I already have this stuff written so it's w/e for now
+
 function getEquipButton(index) {
-    return "<button onclick='equipItem(" + index + ")' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip</button>";
+    return "<button onclick='equipItem(" + index + ", 0)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip</button>";
+}
+
+function getEquipOneHandButton(index) {
+    return "<button onclick='equipItem(" + index + ", 2)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip Left</button>" +
+        "<button onclick='equipItem(" + index + ", 1)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip Right</button>";
+}
+
+function getEquipTwoHandButton(index) {
+    return "<button onclick='equipItem(" + index + ", 3)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip</button>";
+}
+
+function getEquipFCButton(index, coords){
+    return "<button onclick='equipItemFromContainer(" + index + ", {x: " + coords.x + ", y: " + coords.y + "}, 0)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip</button>";
+}
+
+function getEquipOneHandFCButton(index, coords){
+    return "<button onclick='equipItemFromContainer(" + index + ", {x: " + coords.x + ", y: " + coords.y + "}, 2)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip Left</button>" +
+        "<button onclick='equipItemFromContainer(" + index + ", {x: " + coords.x + ", y: " + coords.y + "}, 1)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip Right</button>";
+}
+
+function getEquipTwoHandFCButton(index, coords) {
+    return "<button onclick='equipItemFromContainer(" + index + ", {x: " + coords.x + ", y: " + coords.y + "}, 3)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip</button>";
 }
 
 function getDropButton(index) {
     return "<button onclick='dropItem(" + index + ")' class='mr-2'><i class='fas fa-arrow-down'></i><br/>Drop</button>";
 }
 
-function equipItem(index) {
-    //TODO
+function getPickupButton(index, coords) {
+    return "<button onclick='pickupItem(" + index + ", {x: " + coords.x + ", y: " + coords.y + "})' class='mr-2'><i class='far fa-hand-paper'></i><br/>Pick up</button>";
+}
+
+function equipItem(index, hand) {
+    if (hand == 0) {
+        var type = playerChar.inventory[index].armorType;
+        if (playerChar.equipment[type] != null) {
+            playerChar.inventory.push(playerChar.equipment[type]);
+        }
+        playerChar.equipment[type] = playerChar.inventory[index];
+    } else {
+        if(hand == 1) {
+            if (playerChar.equipment[ARMOR_RIGHTHAND] != null) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_RIGHTHAND]);
+            }
+            playerChar.equipment[ARMOR_RIGHTHAND] = playerChar.inventory[index];
+        } else if (hand == 2) {
+            if (playerChar.equipment[ARMOR_LEFTHAND] != null) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_LEFTHAND]);
+            }
+            if (playerChar.equipment[ARMOR_RIGHTHAND] != null && playerChar.equipment[ARMOR_RIGHTHAND].armorType == ARMOR_TWOHAND) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_RIGHTHAND]);
+                playerChar.equipment[ARMOR_RIGHTHAND] = null;
+            }
+            playerChar.equipment[ARMOR_LEFTHAND] = playerChar.inventory[index];
+        } else {
+            if (playerChar.equipment[ARMOR_LEFTHAND] != null) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_LEFTHAND]);
+            }
+            if (playerChar.equipment[ARMOR_RIGHTHAND] != null) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_RIGHTHAND]);
+            }
+            playerChar.equipment[ARMOR_LEFTHAND] = null;
+            playerChar.equipment[ARMOR_RIGHTHAND] = playerChar.inventory[index];
+        }
+    }
+    playerChar.inventory.splice(index, 1);
+    updateInventoryDisplay();
+    updateEquipUI();
+    toggleUI(UI_EQUIP);
+}
+
+function equipItemFromContainer(index, coords, hand) {
+    var item = gameMap[coords.y][coords.x].getFirstLootableObject().inventory[index];
+    if (hand == 0) {
+        var type = item.armorType;
+        if (playerChar.equipment[type] != null) {
+            playerChar.inventory.push(playerChar.equipment[type]);
+        }
+        playerChar.equipment[type] = item;
+    } else {
+        if(hand == 1) {
+            if (playerChar.equipment[ARMOR_RIGHTHAND] != null) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_RIGHTHAND]);
+            }
+            playerChar.equipment[ARMOR_RIGHTHAND] = item;
+        } else if (hand == 2) {
+            if (playerChar.equipment[ARMOR_LEFTHAND] != null) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_LEFTHAND]);
+            }
+            if (playerChar.equipment[ARMOR_RIGHTHAND] != null && playerChar.equipment[ARMOR_RIGHTHAND].armorType == ARMOR_TWOHAND) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_RIGHTHAND]);
+                playerChar.equipment[ARMOR_RIGHTHAND] = null;
+            }
+            playerChar.equipment[ARMOR_LEFTHAND] = item;
+        } else {
+            if (playerChar.equipment[ARMOR_LEFTHAND] != null) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_LEFTHAND]);
+            }
+            if (playerChar.equipment[ARMOR_RIGHTHAND] != null) {
+                playerChar.inventory.push(playerChar.equipment[ARMOR_RIGHTHAND]);
+            }
+            playerChar.equipment[ARMOR_LEFTHAND] = null;
+            playerChar.equipment[ARMOR_RIGHTHAND] = item;
+        }
+    }
+    gameMap[coords.y][coords.x].getFirstLootableObject().inventory.splice(index, 1);
+    updateInventoryDisplay();
+    updateEquipUI();
+    toggleUI(UI_EQUIP);
+}
+
+function updateEquipUI() {
+    var displayImage = document.getElementById("image-helmet");
+    if (playerChar.equipment[ARMOR_HELMET] == null) {
+        displayImage.src = "Images/nohelmet.png";
+        displayImage.classList = ['object-border', 'rarity-common'];
+    } else {
+        displayImage.src = playerChar.equipment[ARMOR_HELMET].imageURL;
+        displayImage.classList = ['object-border ' + RARITY_CLASSES[playerChar.equipment[ARMOR_HELMET].rarity]];
+    }
+
+    displayImage = document.getElementById("image-torso");
+    if (playerChar.equipment[ARMOR_TORSO] == null) {
+        displayImage.src = "Images/noshirt.png";
+        displayImage.classList = ['object-border', 'rarity-common'];
+    } else {
+        displayImage.src = playerChar.equipment[ARMOR_TORSO].imageURL;
+        displayImage.classList = ['object-border ' + RARITY_CLASSES[playerChar.equipment[ARMOR_TORSO].rarity]];
+    }
+
+    displayImage = document.getElementById("image-ring");
+    if (playerChar.equipment[ARMOR_RING] == null) {
+        displayImage.src = "Images/noshirt.png";
+        displayImage.classList = ['object-border', 'rarity-common'];
+    } else {
+        displayImage.src = playerChar.equipment[ARMOR_RING].imageURL;
+        displayImage.classList = ['object-border ' + RARITY_CLASSES[playerChar.equipment[ARMOR_RING].rarity]];
+    }
+
+    displayImage = document.getElementById("image-pants");
+    if (playerChar.equipment[ARMOR_PANTS] == null) {
+        displayImage.src = "Images/nopants.png";
+        displayImage.classList = ['object-border', 'rarity-common'];
+    } else {
+        displayImage.src = playerChar.equipment[ARMOR_PANTS].imageURL;
+        displayImage.classList = ['object-border ' + RARITY_CLASSES[playerChar.equipment[ARMOR_PANTS].rarity]];
+    }
+
+    if (playerChar.equipment[ARMOR_RIGHTHAND] != null && playerChar.equipment[ARMOR_RIGHTHAND].armorType == ARMOR_TWOHAND) {
+        displayImage = document.getElementById("image-twohand");
+        displayImage.src = playerChar.equipment[ARMOR_RIGHTHAND].imageURL;
+        displayImage.classList = ['object-border ' + RARITY_CLASSES[playerChar.equipment[ARMOR_RIGHTHAND].rarity]];
+
+        document.getElementById("armor-twohand").style.display = "block";
+        document.getElementById("armor-righthand").style.display = "none";
+        document.getElementById("armor-lefthand").style.display = "none";
+    } else {
+        displayImage = document.getElementById("image-righthand");
+        if (playerChar.equipment[ARMOR_RIGHTHAND] == null) {
+            displayImage.src = "Images/norighthand.png";
+            displayImage.classList = ['object-border', 'rarity-common'];
+        } else {
+            displayImage.src = playerChar.equipment[ARMOR_RIGHTHAND].imageURL;
+            displayImage.classList = ['object-border ' + RARITY_CLASSES[playerChar.equipment[ARMOR_RIGHTHAND].rarity]];
+        }
+
+        displayImage = document.getElementById("image-lefthand");
+        if (playerChar.equipment[ARMOR_LEFTHAND] == null) {
+            displayImage.src = "Images/nolefthand.png";
+            displayImage.classList = ['object-border', 'rarity-common'];
+        } else {
+            displayImage.src = playerChar.equipment[ARMOR_LEFTHAND].imageURL;
+            displayImage.classList = ['object-border ' + RARITY_CLASSES[playerChar.equipment[ARMOR_LEFTHAND].rarity]];
+        }
+
+        document.getElementById("armor-twohand").style.display = "none";
+        document.getElementById("armor-righthand").style.display = "block";
+        document.getElementById("armor-lefthand").style.display = "block";
+    }
 }
 
 function dropItem(index) {
-    if (gameMap[playerCoords.y][playerCoords.x].containsContentByType("Dropped Items")) {
-        console.log(gameMap[playerCoords.y][playerCoords.x].getFirstContentByType("Dropped Items"));
-        gameMap[playerCoords.y][playerCoords.x].getFirstContentByType("Dropped Items").inventory.push(playerChar.inventory[index]);
+    if (gameMap[playerCoords.y][playerCoords.x].containsLootableObject()) {
+        var lootableObject = gameMap[playerCoords.y][playerCoords.x].getFirstLootableObject();
+        switch(lootableObject.typeString()) {
+            case "Corpse":
+            case "Dropped Items":
+            default:
+                lootableObject.inventory.push(playerChar.inventory[index]);
+                break;
+        }
         playerChar.inventory.splice(index, 1);
     } else {
         gameMap[playerCoords.y][playerCoords.x].addContents(new DroppedItems([playerChar.inventory[index]]));
         playerChar.inventory.splice(index, 1);
     }
     updateInventoryDisplay();
-    updateSelectorText();
+    removeSelector();
     toggleUI(UI_TILE);
-    toggleContainerUI(RUI_NONE);
+    openContainer(playerCoords);
+    toggleContainerUI(RUI_LOOT);
+}
+
+function pickupItem(index, coords) {
+    var container = gameMap[coords.y][coords.x].getFirstLootableObject();
+    playerChar.inventory.push(container.inventory[index]);
+    container.inventory.splice(index, 1);
+    openContainer(coords);
+    updateInventoryDisplay();
+    if (container.inventory.length == 0 && container.typeString() == "Dropped Items") {
+        gameMap[coords.y][coords.x].removeContentByType("Dropped Items");
+        toggleContainerUI(RUI_NONE);
+    }
 }
 
 function openContainer(coords) {
@@ -304,6 +580,9 @@ function moveAndToggleDoor() {
 }
 
 function removeSelector() {
+    if (selectorCoords.x == null || selectorCoords.y == null) {
+        return;
+    }
     gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
     document.getElementById("selected-tile").innerHTML = "No tile selected";
     document.getElementById("contents-of-tile").innerHTML = "";
@@ -561,6 +840,8 @@ class Character extends WorldObject {
     race = 0;
     backstory = [0, 0];
 
+    equipment = {};
+
     inventory = [];
 
     constructor() {
@@ -581,6 +862,13 @@ class Character extends WorldObject {
 
         this.maxmana = Math.floor(5 + (this.int / 2) + (this.wil / 2) + (this.age / 20));
         this.mana = this.maxmana;
+
+        this.equipment[ARMOR_HELMET] = null;
+        this.equipment[ARMOR_TORSO] = null;
+        this.equipment[ARMOR_PANTS] = null;
+        this.equipment[ARMOR_RING] = null;
+        this.equipment[ARMOR_RIGHTHAND] = null;
+        this.equipment[ARMOR_LEFTHAND] = null;
 
         this.gender = Math.floor(Math.random() * 2);
         this.name = generateName(this.gender) + " " + generateName(2);
@@ -713,6 +1001,15 @@ class Tile {
         for (var i = 0; i < this.contents.length; i++) {
             if (this.contents[i].containsLoot) {
                 return this.contents[i];
+            }
+        }
+        return false;
+    }
+
+    containsLootableObject() {
+        for (var i = 0; i < this.contents.length; i++) {
+            if (this.contents[i].containsLoot) {
+                return true;
             }
         }
         return false;
@@ -950,61 +1247,6 @@ document.getElementById("player-mem").innerHTML = "MEM: " + playerChar.mem;
 // context for game (initialized null)
 var ctx = null;
 
-// constant values for directions in generating the map
-const DIR_N = 1;
-const DIR_E = 2;
-const DIR_S = 4;
-const DIR_W = 8;
-
-// constant values for getShortestDistance
-const PATH = 0;
-const DIST = 1;
-const ALL_PATHS = 2;
-const ALL_DISTS = 4;
-
-// constant values for actions in Player.moveQueue
-const ACTION_LOOT = 0;
-const ACTION_OPEN = 1;
-
-// constant values for equipment
-const ARMOR_UNDEFINED = -1;
-const ARMOR_HELMET = 0;
-const ARMOR_TORSO = 1;
-const ARMOR_TWOHAND = 2;
-const ARMOR_ONEHAND = 4;
-const ARMOR_PANTS = 8;
-const ARMOR_RING = 16;
-
-// constant values for InventoryObject rarities
-const RARITY_COMMON = 0;
-const RARITY_UNCOMMON = 1;
-const RARITY_RARE = 2;
-const RARITY_EPIC = 4;
-const RARITY_LEGENDARY = 8;
-const RARITY_COLORS = {};
-RARITY_COLORS[RARITY_COMMON] = "#FFFFFF";
-RARITY_COLORS[RARITY_UNCOMMON] = "#28DE3D";
-RARITY_COLORS[RARITY_RARE] = "#00D0FF";
-RARITY_COLORS[RARITY_EPIC] = "#D400FF";
-RARITY_COLORS[RARITY_LEGENDARY] = "#FF5500";
-
-const RARITY_CLASSES = {};
-RARITY_CLASSES[RARITY_COMMON] = "rarity-common";
-RARITY_CLASSES[RARITY_UNCOMMON] = "rarity-uncommon";
-RARITY_CLASSES[RARITY_RARE] = "rarity-rare";
-RARITY_CLASSES[RARITY_EPIC] = "rarity-epic";
-RARITY_CLASSES[RARITY_LEGENDARY] = "rarity-legendary";
-
-// constant values for toggling the left-most display
-const UI_NONE = 0;
-const UI_EQUIP = 1;
-const UI_ITEM = 2;
-const UI_TILE = 4;
-
-// constant values for toggling the bottom-right display
-const RUI_NONE = 0;
-const RUI_LOOT = 1;
-
 // tile width, height, map width, height, and frame information for display
 
 var canvasSize = 400;
@@ -1088,12 +1330,9 @@ function fillRectangle(corner1, corner2, tileFunction) {
     }
 }
 
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Flavorful", "Images/none.png"));
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_UNCOMMON, false, "Flavorful", "Images/none.png"));
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_RARE, false, "Flavorful", "Images/none.png"));
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_EPIC, false, "Flavorful", "Images/none.png"));
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_LEGENDARY, false, "Flavorful", "Images/none.png"));
 playerChar.inventory.push(new Equip("Sword of the Stinky", RARITY_EPIC, ARMOR_ONEHAND, "The stinkiest sword to ever grace humanity", "Images/none.png"));
-playerChar.inventory.push(new InventoryObject("Test Object", RARITY_LEGENDARY, false, "Flavorful", "Images/none.png"));
+playerChar.inventory.push(new Equip("Poopy Claymore", RARITY_UNCOMMON, ARMOR_TWOHAND, "Big poop sword", "Images/none.png"));
+playerChar.inventory.push(new Equip("Ring", RARITY_EPIC, ARMOR_RING, "A ring lol", "Images/none.png"));
+
 
 updateInventoryDisplay();

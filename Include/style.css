@@ -30,3 +30,7 @@
     color: #FF5500;
     border-color: #FF5500;
 }
+
+button {
+    max-width: 60px;
+}
