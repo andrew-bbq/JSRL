@@ -79,6 +79,9 @@ function drawGame() {
         for (var x = 0; x < renderW; x++) {
             ctx.fillStyle = gameMap[y][x].outlineColor;
             ctx.fillRect(x * tileW, y * tileH, tileW, tileH);
+            if (overlay[y][x]) {
+                ctx.fillStyle = blendColors(gameMap[y][x].displayColor, overlay[y],[x]);
+            }
             ctx.fillStyle = gameMap[y][x].displayColor;
             ctx.fillRect(x * tileW + 1, y * tileH + 1, tileW - 2, tileH - 2);
         }
@@ -281,7 +284,7 @@ function getObjectOptions(index) {
     if (playerChar.inventory[index].isArmor) {
         if (playerChar.inventory[index].armorType == ARMOR_ONEHAND) {
             document.getElementById("item-actions").innerHTML += getEquipOneHandButton(index);
-        } else if(playerChar.inventory[index].armorType == ARMOR_TWOHAND) {
+        } else if (playerChar.inventory[index].armorType == ARMOR_TWOHAND) {
             document.getElementById("item-actions").innerHTML += getEquipTwoHandButton(index);
         } else {
             document.getElementById("item-actions").innerHTML += getEquipButton(index);
@@ -298,7 +301,7 @@ function getContainerObjectOptions(index, coords) {
     document.getElementById("item-flavor-text").innerHTML = item.flavorText;
     document.getElementById("item-actions").innerHTML = "";
     if (item.isArmor) {
-        if (item.armorType == ARMOR_ONEHAND){
+        if (item.armorType == ARMOR_ONEHAND) {
             document.getElementById("item-actions").innerHTML += getEquipOneHandFCButton(index, coords);
         } else if (item.armorType == ARMOR_TWOHAND) {
             document.getElementById("item-actions").innerHTML += getEquipTwoHandFCButton(index, coords);
@@ -326,11 +329,11 @@ function getEquipTwoHandButton(index) {
     return "<button onclick='equipItem(" + index + ", 3)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip</button>";
 }
 
-function getEquipFCButton(index, coords){
+function getEquipFCButton(index, coords) {
     return "<button onclick='equipItemFromContainer(" + index + ", {x: " + coords.x + ", y: " + coords.y + "}, 0)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip</button>";
 }
 
-function getEquipOneHandFCButton(index, coords){
+function getEquipOneHandFCButton(index, coords) {
     return "<button onclick='equipItemFromContainer(" + index + ", {x: " + coords.x + ", y: " + coords.y + "}, 2)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip Left</button>" +
         "<button onclick='equipItemFromContainer(" + index + ", {x: " + coords.x + ", y: " + coords.y + "}, 1)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip Right</button>";
 }
@@ -355,7 +358,7 @@ function equipItem(index, hand) {
         }
         playerChar.equipment[type] = playerChar.inventory[index];
     } else {
-        if(hand == 1) {
+        if (hand == 1) {
             if (playerChar.equipment[ARMOR_RIGHTHAND] != null) {
                 playerChar.inventory.push(playerChar.equipment[ARMOR_RIGHTHAND]);
             }
@@ -395,7 +398,7 @@ function equipItemFromContainer(index, coords, hand) {
         }
         playerChar.equipment[type] = item;
     } else {
-        if(hand == 1) {
+        if (hand == 1) {
             if (playerChar.equipment[ARMOR_RIGHTHAND] != null) {
                 playerChar.inventory.push(playerChar.equipment[ARMOR_RIGHTHAND]);
             }
@@ -499,7 +502,7 @@ function updateEquipUI() {
 function dropItem(index) {
     if (gameMap[playerCoords.y][playerCoords.x].containsLootableObject()) {
         var lootableObject = gameMap[playerCoords.y][playerCoords.x].getFirstLootableObject();
-        switch(lootableObject.typeString()) {
+        switch (lootableObject.typeString()) {
             case "Corpse":
             case "Dropped Items":
             default:
@@ -639,7 +642,7 @@ const skills = {
     axe: [],
     spear: [],
     bow: [],
-    fire: [],
+    fire: [{ name: "Fireball", range: 10 }],
     water: [],
     air: [],
     earth: [],
@@ -1149,6 +1152,37 @@ function generateName(charGender) {
     return name;
 }
 
+/**
+ * Average the RGB values between two colors and return the resulting color
+ * @param {string} color1 to average with color2
+ * @param {string} color2 to average with color1
+ */
+function blendColors(color1, color2) {
+    var r1 = parseInt(color1.substr(1, 2), 16);
+    var g1 = parseInt(color1.substr(3, 2), 16);
+    var b1 = parseInt(color1.substr(5), 16);
+    var r2 = parseInt(color2.substr(1, 2), 16);
+    var g2 = parseInt(color2.substr(3, 2), 16);
+    var b2 = parseInt(color2.substr(5), 16);
+    var ravg = Math.floor((r1 + r2) / 2).toString(16);
+    if (ravg.length == 1) {
+        ravg = "0" + ravg;
+    }
+    var gavg = Math.floor((g1 + g2) / 2).toString(16);
+    if (gavg.length == 1) {
+        gavg = "0" + gavg;
+    }
+    var bavg = Math.floor((b1 + b2) / 2).toString(16);
+    if (bavg.length == 1) {
+        bavg = "0" + bavg;
+    }
+    return "#" + ravg + gavg + bavg;
+}
+
+/**
+ * Check if point is both inbounds and not a wall/impassable tile
+ * @param {dictionary} point to check
+ */
 function pointIsValid(point) {
     var isInbounds = (point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH);
     if (!isInbounds) return isInbounds;
@@ -1161,10 +1195,19 @@ function pointIsValid(point) {
     return (isInbounds && gameMap[point.y][point.x].type < 100 && !containsImpassableObject);
 }
 
+/**
+ * Check if two points are equal - needed since two points need to be referencing the same object for them to be considered equal otherwise.
+ * @param {dictionary} point1 
+ * @param {dictionary} point2 
+ */
 function pointsAreEqual(point1, point2) {
     return (point1.x == point2.x && point1.y == point2.y);
 }
 
+/**
+ * Print point in string form - used for debugging
+ * @param {dictionary} point to print
+ */
 function pointToString(point) {
     return "x: " + point.x + ",y: " + point.y;
 }
@@ -1258,13 +1301,29 @@ var playerCoords = { x: null, y: null };
 var combatQueue = [];
 
 var gameMap = [];
+var overlay = [];
 for (var i = 0; i < renderH; i++) {
-    // create new array
+    // create new arrays
     var row = [];
     for (var j = 0; j < renderW; j++) {
         row.push(newGrassTile());
     }
     gameMap.push(row);
+}
+unsetOverlay();
+
+/**
+ * set all overlay values to false, signifying not to modify the colors of any of the tiles
+ */
+function unsetOverlay() {
+    overlay = [];
+    for (var i = 0; i < renderH; i++) {
+        var row = [];
+        for (var j = 0; j < renderW; j++) {
+            row.push(false);
+        }
+        overlay.push(row);
+    }
 }
 
 placeRectangle({ x: 3, y: 5 }, { x: 9, y: 13 }, "newWallTile");
