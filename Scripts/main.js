@@ -154,7 +154,7 @@ canvas.addEventListener('mousedown', function (e) {
 });
 
 /**
- * Update left side selector info
+ * Update left side selector info, getting options for tile and its contents
  */
 function updateSelectorText() {
     if (selectorCoords.x != null && selectorCoords.y != null) {
@@ -206,9 +206,9 @@ function updateSelectorText() {
 }
 
 /**
- * Move selector
- * @param int squareX 
- * @param int squareY 
+ * Move selector to specified coordinates (Might want to update to use a {dictionary} coords parameter)
+ * @param {int} squareX x coord to move selector to
+ * @param {int} squareY y coord to mvoe selector to
  */
 function moveSelector(squareX, squareY) {
     if (selectorCoords.x != null && selectorCoords != null) {
@@ -218,34 +218,6 @@ function moveSelector(squareX, squareY) {
     selectorCoords.x = squareX;
     selectorCoords.y = squareY;
     updateSelectorText();
-}
-
-function getMoveButton() {
-    return "<button onclick='moveToSelector()' class='mr-2'><i class='fa fa-hiking'></i><br/>Move</button>";
-}
-
-function getLootButton() {
-    return "<button onclick='moveAndLootImpassableSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
-}
-
-function getLootExactButton() {
-    return "<button onclick='moveAndLootSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
-}
-
-function getOpenButton() {
-    return "<button onclick='moveAndToggleDoor()' class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
-}
-
-function getDisabledOpenButton() {
-    return "<button disabled class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
-}
-
-function getCloseButton() {
-    return "<button onclick='moveAndToggleDoor()' class='mr-2'><i class='fa fa-door-closed'></i><br/>Close</button>"
-}
-
-function getDeselectButton() {
-    return "<button onclick='removeSelector()' class='mr-2'><i class='fa fa-remove'></i><br/>Cancel</button>";
 }
 
 function updateHealthDisplay() {
@@ -259,6 +231,9 @@ function updateHealthDisplay() {
     document.getElementById("health-lleg").innerHTML = "Left leg: " + playerChar.leftleg + "%";
 }
 
+/**
+ * Update player inventory display to match player's inventory - should be called any time inventory is changed
+ */
 function updateInventoryDisplay() {
     var inv = document.getElementById("player-inventory");
     inv.innerHTML = "";
@@ -267,14 +242,10 @@ function updateInventoryDisplay() {
     }
 }
 
-function getObjectButton(invObject, index) {
-    return "<img class='hover-pointer mr-1 mt-1 object-border " + RARITY_CLASSES[invObject.rarity] + "' onclick='getObjectOptions(" + index + ")' src='" + invObject.imageURL + "' />";
-}
-
-function getContainerObjectButton(invObject, index, coords) {
-    return "<img class='hover-pointer mr-1 mt-1 object-border " + RARITY_CLASSES[invObject.rarity] + "' onclick='getContainerObjectOptions(" + index + ", {x: " + coords.x + ", y: " + coords.y + "})' src='" + invObject.imageURL + "' />";
-}
-
+/**
+ * Get options for an InventoryObject in player's inventory
+ * @param {int} index of item in player's inventory to get options for
+ */
 function getObjectOptions(index) {
     var item = playerChar.inventory[index];
     document.getElementById("item-name").innerHTML = item.name;
@@ -294,6 +265,11 @@ function getObjectOptions(index) {
     toggleUI(UI_ITEM);
 }
 
+/**
+ * Get options for an InventoryObject located in a container at specified coordinates
+ * @param {int} index of item to get options for
+ * @param {dictionary} coords of container to get item from
+ */
 function getContainerObjectOptions(index, coords) {
     var item = gameMap[coords.y][coords.x].getFirstLootableObject().inventory[index];
     document.getElementById("item-name").innerHTML = item.name;
@@ -315,6 +291,8 @@ function getContainerObjectOptions(index, coords) {
 
 // could probably consolidate into a single getEquipButton with a function name, hand index, and button text field, 
 // but then that would move work up into the code above and I already have this stuff written so it's w/e for now
+
+// --------------------- BUTTON SECTION --------------------------------------------
 
 function getEquipButton(index) {
     return "<button onclick='equipItem(" + index + ", 0)' class='mr-2'><i class='fa fa-mitten'></i><br/>Equip</button>";
@@ -350,6 +328,49 @@ function getPickupButton(index, coords) {
     return "<button onclick='pickupItem(" + index + ", {x: " + coords.x + ", y: " + coords.y + "})' class='mr-2'><i class='far fa-hand-paper'></i><br/>Pick up</button>";
 }
 
+function getObjectButton(invObject, index) {
+    return "<img class='hover-pointer mr-1 mt-1 object-border " + RARITY_CLASSES[invObject.rarity] + "' onclick='getObjectOptions(" + index + ")' src='" + invObject.imageURL + "' />";
+}
+
+function getContainerObjectButton(invObject, index, coords) {
+    return "<img class='hover-pointer mr-1 mt-1 object-border " + RARITY_CLASSES[invObject.rarity] + "' onclick='getContainerObjectOptions(" + index + ", {x: " + coords.x + ", y: " + coords.y + "})' src='" + invObject.imageURL + "' />";
+}
+
+function getMoveButton() {
+    return "<button onclick='moveToSelector()' class='mr-2'><i class='fa fa-hiking'></i><br/>Move</button>";
+}
+
+function getLootButton() {
+    return "<button onclick='moveAndLootImpassableSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
+}
+
+function getLootExactButton() {
+    return "<button onclick='moveAndLootSelector()' class='mr-2'><i class='fa fa-box-open'></i><br/>Loot</button>"
+}
+
+function getOpenButton() {
+    return "<button onclick='moveAndToggleDoor()' class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
+}
+
+function getDisabledOpenButton() {
+    return "<button disabled class='mr-2'><i class='fa fa-door-open'></i><br/>Open</button>"
+}
+
+function getCloseButton() {
+    return "<button onclick='moveAndToggleDoor()' class='mr-2'><i class='fa fa-door-closed'></i><br/>Close</button>"
+}
+
+function getDeselectButton() {
+    return "<button onclick='removeSelector()' class='mr-2'><i class='fa fa-remove'></i><br/>Cancel</button>";
+}
+
+// --------------------- END BUTTON SECTION ---------------------------------
+
+/**
+ * Equip item to player's equipment from player's inventory
+ * @param {int} index of item in player inventory to equip
+ * @param {int} hand hand to equip item in (1 for right, 2 for left, 0 if not hand)
+ */
 function equipItem(index, hand) {
     if (hand == 0) {
         var type = playerChar.inventory[index].armorType;
@@ -389,6 +410,12 @@ function equipItem(index, hand) {
     toggleUI(UI_EQUIP);
 }
 
+/**
+ * Equip item from container to respective equipment slot on player - existing item moved into player's inventory
+ * @param {int} index of item in inventory of container to equip
+ * @param {dictionary} coords of tile with container to loot
+ * @param {int} hand hand to equip item in (1 for right, 2 for left)
+ */
 function equipItemFromContainer(index, coords, hand) {
     var item = gameMap[coords.y][coords.x].getFirstLootableObject().inventory[index];
     if (hand == 0) {
@@ -429,6 +456,9 @@ function equipItemFromContainer(index, coords, hand) {
     toggleUI(UI_EQUIP);
 }
 
+/**
+ * Update top-left Equip display (Update item images and rarity borders)
+ */
 function updateEquipUI() {
     var displayImage = document.getElementById("image-helmet");
     if (playerChar.equipment[ARMOR_HELMET] == null) {
@@ -499,6 +529,10 @@ function updateEquipUI() {
     }
 }
 
+/**
+ * Throw an object on the ground from the player's inventory
+ * @param {int} index index of item in player's inventory to drop
+ */
 function dropItem(index) {
     if (gameMap[playerCoords.y][playerCoords.x].containsLootableObject()) {
         var lootableObject = gameMap[playerCoords.y][playerCoords.x].getFirstLootableObject();
@@ -519,8 +553,14 @@ function dropItem(index) {
     toggleUI(UI_TILE);
     openContainer(playerCoords);
     toggleContainerUI(RUI_LOOT);
+    gameMap[playerCoords.y][playerCoords.x].updateOverride();
 }
 
+/**
+ * Add a specified item to player inventory from the specified container
+ * @param {int} index index of item in specified container's inventory
+ * @param {dictionary} coords of container to take from
+ */
 function pickupItem(index, coords) {
     var container = gameMap[coords.y][coords.x].getFirstLootableObject();
     playerChar.inventory.push(container.inventory[index]);
@@ -533,6 +573,10 @@ function pickupItem(index, coords) {
     }
 }
 
+/**
+ * Open the container inventory in the bottom right display (for the container at the specified coordinates)
+ * @param {dictionary} coords contains x (index x) and y (index y) coords to open container UI for
+ */
 function openContainer(coords) {
     toggleContainerUI(RUI_LOOT);
     var inv = document.getElementById("container-inventory");
@@ -544,6 +588,10 @@ function openContainer(coords) {
     }
 }
 
+/**
+ * Display the specified UI in the top left display
+ * @param {int} toDisplay constant representing the display for the main UI (Options are UI_NONE, UI_TILE, UI_ITEM, UI_EQUIP)
+ */
 function toggleUI(toDisplay) {
     document.getElementById("tile-info").style.display = "none";
     document.getElementById("equip-info").style.display = "none";
@@ -563,6 +611,10 @@ function toggleUI(toDisplay) {
     }
 }
 
+/**
+ * Display the specified UI in the bottom right display
+ * @param {int} toDisplay constant representing display for container UI (Options are RUI_NONE, RUI_LOOT)
+ */
 function toggleContainerUI(toDisplay) {
     document.getElementById("alternate-inventory").style.display = "none";
     switch (toDisplay) {
@@ -574,6 +626,9 @@ function toggleContainerUI(toDisplay) {
     }
 }
 
+/**
+ * Queue movement and toggling for door, using closest adjacent point
+ */
 function moveAndToggleDoor() {
     toggleContainerUI(RUI_NONE);
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
@@ -582,6 +637,9 @@ function moveAndToggleDoor() {
     removeSelector();
 }
 
+/**
+ * Remove selector from map, update tile UI
+ */
 function removeSelector() {
     if (selectorCoords.x == null || selectorCoords.y == null) {
         return;
@@ -594,6 +652,9 @@ function removeSelector() {
     selectorCoords.y = null;
 }
 
+/**
+ * Queue movement to selector's current location, update tile UI
+ */
 function moveToSelector() {
     toggleContainerUI(RUI_NONE);
     playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH);
@@ -605,6 +666,9 @@ function moveToSelector() {
     selectorCoords.y = null;
 }
 
+/**
+ * Queue movement and looting for closest adjacent point to selector
+ */
 function moveAndLootImpassableSelector() {
     toggleContainerUI(RUI_NONE);
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
@@ -613,6 +677,9 @@ function moveAndLootImpassableSelector() {
     removeSelector();
 }
 
+/**
+ * Queue movement and looting for exact position of container
+ */
 function moveAndLootSelector() {
     toggleContainerUI(RUI_NONE);
     playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH);
@@ -620,6 +687,10 @@ function moveAndLootSelector() {
     removeSelector();
 }
 
+/**
+ * Given a point, return the closest adjacent point to the player (Out of [x-1, y],[x+1, y],[x, y-1],[x, y+1], which one is closest to player)
+ * @param {dictionary} point with x index representing x coord and y index representing y coord
+ */
 function getAdjacentPointClosestToPlayer(point) {
     var adjPoints = [];
     var minPoint = [MAX_DISTANCE, { x: MAX_DISTANCE, y: MAX_DISTANCE }];
@@ -710,13 +781,15 @@ class InventoryObject {
     isArmor = false;
     flavorText = "";
     imageURL = "none.png"
+    bonus = 0;
 
-    constructor(name, rarity, isArmor, flavorText, imageURL) {
+    constructor(name, rarity, isArmor, flavorText, imageURL, bonus) {
         this.name = name;
         this.rarity = rarity;
         this.isArmor = isArmor;
         this.flavorText = flavorText;
         this.imageURL = imageURL;
+        this.bonus = bonus;
     }
 
     typeString() {
@@ -732,8 +805,8 @@ class Equip extends InventoryObject {
     damage = 0;
     range = 1;
 
-    constructor(name, rarity, armorType, flavorText, imageURL) {
-        super(name, rarity, true, flavorText, imageURL);
+    constructor(name, rarity, armorType, flavorText, imageURL, bonus) {
+        super(name, rarity, true, flavorText, imageURL, bonus);
         this.armorType = armorType;
     }
 
@@ -790,7 +863,7 @@ class Door extends WorldObject {
     locked = false;
 
     constructor(locked) {
-        super(1, "#b38200", false, false, true);
+        super(100, "#b38200", false, false, true);
         this.locked = locked;
     }
 
@@ -798,6 +871,9 @@ class Door extends WorldObject {
         return "Door";
     }
 
+    /**
+     * Toggle opened status of this door, don't allow if locked.
+     */
     toggleOpen() {
         if (!this.locked || !this.impassable) {
             this.impassable = !this.impassable;
@@ -931,6 +1007,10 @@ class Tile {
         this.name = name;
     }
 
+    /**
+     * Add an object/some objects to the contents of this tile
+     * @param {mixed} contents either an array of objects, or an object to add to the contents of this tile
+     */
     addContents(contents) {
         if (Array.isArray(contents)) {
             this.contents.concat(contents);
@@ -940,20 +1020,24 @@ class Tile {
         this.updateOverride();
     }
 
+    /**
+     * Updates the color of this tile for the display depending on its contents
+     */
     updateOverride() {
         if (this.contents.length == 0) {
             this.displayColor = this.defaultColor;
             this.outlineColor = this.defaultColor;
         } else {
-            var currentOutlinePriority = (this.contents[0].outline ? this.contents[0].priority : -1000);
-            var currentlyOutlined = false;
+            var currentOutlinePriority = (this.contents[0].outline ? this.contents[0].priority : -10000);
+            var currentlyOutlined = this.contents[0].outline;
             var currentDisplayItem = this.contents[0];
+            this.outlineColor = this.contents[0].color;
             for (var i = 1; i < this.contents.length; i++) {
                 if (this.contents[i].outline && this.contents[i].priority > currentOutlinePriority) {
                     currentOutlinePriority = this.contents[i].priority;
                     currentlyOutlined = true;
                     this.outlineColor = this.contents[i].color;
-                } else if (this.contents[i].priority > currentDisplayItem.priority) {
+                } else if (this.contents[i].priority > currentDisplayItem.priority || currentDisplayItem.outline) {
                     currentDisplayItem = this.contents[i];
                 }
             }
@@ -973,8 +1057,12 @@ class Tile {
         }
     }
 
+    /**
+     * Removes all objects from this tile's contents with the specified typeString
+     * @param {string} toRemove typeString of object to remove
+     */
     removeContentByType(toRemove) {
-        for (var i = 0; i < this.contents.length; i++) {
+        for (var i = this.contents.length - 1; i >= 0; i--) {
             if (this.contents[i].typeString() == toRemove) {
                 this.contents.splice(i, 1);
             }
@@ -982,6 +1070,10 @@ class Tile {
         this.updateOverride();
     }
 
+    /**
+     * Check if this tile's contents contains an object with the specified typeString
+     * @param {string} toFind typeString of object to find
+     */
     containsContentByType(toFind) {
         for (var i = 0; i < this.contents.length; i++) {
             if (this.contents[i].typeString() == toFind) {
@@ -991,6 +1083,10 @@ class Tile {
         return false;
     }
 
+    /**
+     * Returns the first object with the specified typeString, or false if none
+     * @param {string} toFind typeString of object to find
+     */
     getFirstContentByType(toFind) {
         for (var i = 0; i < this.contents.length; i++) {
             if (this.contents[i].typeString() == toFind) {
@@ -1000,6 +1096,9 @@ class Tile {
         return false;
     }
 
+    /**
+     * Returns the first object with the lootable property inside this tile's contents, or false if none
+     */
     getFirstLootableObject() {
         for (var i = 0; i < this.contents.length; i++) {
             if (this.contents[i].containsLoot) {
@@ -1009,6 +1108,9 @@ class Tile {
         return false;
     }
 
+    /**
+     * Checks if this tile contains an object with the lootable property
+     */
     containsLootableObject() {
         for (var i = 0; i < this.contents.length; i++) {
             if (this.contents[i].containsLoot) {
@@ -1019,6 +1121,10 @@ class Tile {
     }
 }
 
+/**
+ * Function to generate character names, with some degree of realism (lol)
+ * @param {int} charGender representing the gender of the name, 0 for male, 1 for female, 2 for random
+ */
 function generateName(charGender) {
     var femEV = ["ia", "ie", "a", "y", "ey", "ah", "oe"];
     var femEC = ["l", "th", "n", "r", "ce"];
@@ -1333,7 +1439,7 @@ gameMap[9][9] = newStoneTile();
 gameMap[9][9].addContents(new Door(false));
 
 gameMap[20][20].addContents(new Chest([]));
-gameMap[20][20].getFirstLootableObject().inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Hello", "Images/none.png"));
+gameMap[20][20].getFirstLootableObject().inventory.push(new InventoryObject("Test Object", RARITY_COMMON, false, "Hello", "Images/none.png", 0));
 
 gameMap[12][12].addContents(playerChar);
 fillRectangle({ x: 20, y: 2 }, { x: 23, y: 5 }, "newOceanTile");
@@ -1389,9 +1495,9 @@ function fillRectangle(corner1, corner2, tileFunction) {
     }
 }
 
-playerChar.inventory.push(new Equip("Sword of the Stinky", RARITY_EPIC, ARMOR_ONEHAND, "The stinkiest sword to ever grace humanity", "Images/none.png"));
-playerChar.inventory.push(new Equip("Poopy Claymore", RARITY_UNCOMMON, ARMOR_TWOHAND, "Big poop sword", "Images/none.png"));
-playerChar.inventory.push(new Equip("Ring", RARITY_EPIC, ARMOR_RING, "A ring lol", "Images/none.png"));
+playerChar.inventory.push(new Equip("Sword of the Stinky", RARITY_EPIC, ARMOR_ONEHAND, "The stinkiest sword to ever grace humanity", "Images/none.png", 0));
+playerChar.inventory.push(new Equip("Poopy Claymore", RARITY_UNCOMMON, ARMOR_TWOHAND, "Big poop sword", "Images/none.png", 0));
+playerChar.inventory.push(new Equip("Ring", RARITY_EPIC, ARMOR_RING, "A ring lol", "Images/none.png", 0));
 
 
 updateInventoryDisplay();
