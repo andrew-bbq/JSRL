@@ -56,6 +56,20 @@ const UI_TILE = 4;
 const RUI_NONE = 0;
 const RUI_LOOT = 1;
 
+// context for game (initialized null)
+var ctx = null;
+
+// tile width, height, map width, height, and frame information for display
+
+var canvasSize = 400;
+var renderW = 25, renderH = 25;
+var tileW = canvasSize / renderW, tileH = canvasSize / renderH;
+var currentSecond = 0, frameCount = 0, framesLastSecond = 0;
+var selectorCoords = { x: null, y: null };
+var playerCoords = { x: null, y: null };
+var combatQueue = [];
+
+// more game info
 var tick = 0;
 var gameSpeed = 6;
 var playerTookTurn = false;
@@ -80,9 +94,10 @@ function drawGame() {
             ctx.fillStyle = gameMap[y][x].outlineColor;
             ctx.fillRect(x * tileW, y * tileH, tileW, tileH);
             if (overlay[y][x]) {
-                ctx.fillStyle = blendColors(gameMap[y][x].displayColor, overlay[y],[x]);
+                ctx.fillStyle = blendColors(gameMap[y][x].displayColor, overlay[y][x]);
+            } else {
+                ctx.fillStyle = gameMap[y][x].displayColor;
             }
-            ctx.fillStyle = gameMap[y][x].displayColor;
             ctx.fillRect(x * tileW + 1, y * tileH + 1, tileW - 2, tileH - 2);
         }
     }
@@ -150,6 +165,11 @@ canvas.addEventListener('mousedown', function (e) {
     } else {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
+        var line = (BresenhamLine(playerCoords, selectorCoords));
+        unsetOverlay();
+        for(var i = 0; i < line.length; i++) {
+            overlay[line[i].y][line[i].x] = "#FF0000";
+        }
     }
 });
 
@@ -860,6 +880,7 @@ class DroppedItems extends WorldObject {
 }
 
 class Door extends WorldObject {
+
     locked = false;
 
     constructor(locked) {
@@ -1378,7 +1399,73 @@ function getShortestPath(point1, point2, returnType) {
         case ALL_DISTS:
             return dist;
     }
+}
 
+/**
+ * Get list of points from point1 to point2, crossing all untraversable terrain
+ * @param {dictionary} point1 
+ * @param {dictionary} point2 
+ */
+function BresenhamLine(point1, point2){
+    var result = [];
+
+    var steep = Math.abs(point2.y - point1.y) > Math.abs(point2.x, point1);
+    // if slope > 0.5, swap x and y coords
+    if (steep) {
+        var temp = point1.y;
+        point1.y = point1.x;
+        point1.x = temp;
+        temp = point2.y;
+        point2.y = point2.x;
+        point2.x = temp;
+    }
+    // if, swap point1 and point2
+    if (point1.x > point2.x) {
+        var temp = point2;
+        point2 = point1;
+        point1 = temp;
+    }
+
+    var deltax = point2.x - point1.x;
+    var deltay = Math.abs(point2.y - point1.y);
+    var error = 0;
+    var ystep;
+    var y = point1.y;
+    if (point1.y < point2.y) {
+        ystep = 1;
+    } else {
+        ystep = -1;
+    }
+
+    for (var x = point1.x; x <= point2.x; x++) {
+        if (steep) {
+            result.push({x: y, y: x});
+        } else {
+            result.push({x: x, y: y});
+        }
+        error += deltay;
+        if(2 * error >= deltax) {
+            y += ystep;
+            error -= deltax;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Get line from point1 to point2 without crossing traversable terrain using BresenhamLine()
+ * @param {dictionary} point1 
+ * @param {dictionary} point2 
+ */
+function Raycast(point1, point2){
+    var rayLine = BresenhamLine(point1, point2);
+    for (var i = rayLine.length - 1; i >= 0; i--) {
+        if (!pointIsValid(rayLine[i])) {
+            return rayLine.splice(i);
+        }
+    }
+    return rayLine;
 }
 
 var playerChar = new Player();
@@ -1392,19 +1479,6 @@ document.getElementById("player-int").innerHTML = "INT: " + playerChar.int;
 document.getElementById("player-arm").innerHTML = "ARM: " + playerChar.arm;
 document.getElementById("player-wil").innerHTML = "WIL: " + playerChar.wil;
 document.getElementById("player-mem").innerHTML = "MEM: " + playerChar.mem;
-
-// context for game (initialized null)
-var ctx = null;
-
-// tile width, height, map width, height, and frame information for display
-
-var canvasSize = 400;
-var renderW = 25, renderH = 25;
-var tileW = canvasSize / renderW, tileH = canvasSize / renderH;
-var currentSecond = 0, frameCount = 0, framesLastSecond = 0;
-var selectorCoords = { x: null, y: null };
-var playerCoords = { x: null, y: null };
-var combatQueue = [];
 
 var gameMap = [];
 var overlay = [];
