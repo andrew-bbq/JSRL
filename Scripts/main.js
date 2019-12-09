@@ -165,9 +165,9 @@ canvas.addEventListener('mousedown', function (e) {
     } else {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
-        var line = (BresenhamLine(playerCoords, selectorCoords));
+        var line = (Raycast(playerCoords, selectorCoords));
         unsetOverlay();
-        for(var i = 0; i < line.length; i++) {
+        for (var i = 0; i < line.length; i++) {
             overlay[line[i].y][line[i].x] = "#FF0000";
         }
     }
@@ -1401,55 +1401,82 @@ function getShortestPath(point1, point2, returnType) {
     }
 }
 
+
 /**
- * Get list of points from point1 to point2, crossing all untraversable terrain
+ * Get list of points from point1 to point2, crossing all untraversable terrain, essentially a helper method for High/LowLine
+ * src: https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
  * @param {dictionary} point1 
  * @param {dictionary} point2 
  */
-function BresenhamLine(point1, point2){
-    var result = [];
-
-    var steep = Math.abs(point2.y - point1.y) > Math.abs(point2.x, point1);
-    // if slope > 0.5, swap x and y coords
-    if (steep) {
-        var temp = point1.y;
-        point1.y = point1.x;
-        point1.x = temp;
-        temp = point2.y;
-        point2.y = point2.x;
-        point2.x = temp;
-    }
-    // if, swap point1 and point2
-    if (point1.x > point2.x) {
-        var temp = point2;
-        point2 = point1;
-        point1 = temp;
-    }
-
-    var deltax = point2.x - point1.x;
-    var deltay = Math.abs(point2.y - point1.y);
-    var error = 0;
-    var ystep;
-    var y = point1.y;
-    if (point1.y < point2.y) {
-        ystep = 1;
-    } else {
-        ystep = -1;
-    }
-
-    for (var x = point1.x; x <= point2.x; x++) {
-        if (steep) {
-            result.push({x: y, y: x});
+function Line(point1,point2){
+    if (Math.abs(point2.y - point1.y) < Math.abs(point2.x - point1.x)){
+        if (point1.x > point2.x){
+            return LowLine(point2, point1);
         } else {
-            result.push({x: x, y: y});
+            return LowLine(point1, point2);
         }
-        error += deltay;
-        if(2 * error >= deltax) {
-            y += ystep;
-            error -= deltax;
+    } else {
+        if (point1.y > point2.y) {
+            return HighLine(point2, point1);
+        } else {
+            return HighLine(point1, point2);
         }
     }
+}
 
+/**
+ * Get Bresenham Line for points with slope > 0.5
+ * @param {dictionary} point1 
+ * @param {dictionary} point2 
+ */
+function HighLine(point1, point2) {
+    var dx = point2.x - point1.x;
+    var dy = point2.y - point1.y;
+    xi = 1;
+    if (dx < 0) {
+        xi = -1;
+        dx = -dx;
+    }
+    var D = (2*dx)-dy;
+    var x = point1.x;
+
+    var result = [];
+    for (var y = point1.y; y <= point2.y; y++){
+        result.push({x:x,y:y});
+        if (D>0){
+            x += xi;
+            D -= 2*dy;
+        }
+        D += 2*dx;
+    }
+    return result;
+}
+
+/**
+ * Get Bresenham Line for points with slope < 0.5
+ * @param {dictionary} point1 
+ * @param {dictionary} point2 
+ */
+function LowLine(point1, point2) {
+    var dx = point2.x - point1.x;
+    var dy = point2.y - point1.y;
+    var yi = 1;
+    if (dy < 0){
+        yi = -1;
+        dy = -dy;
+    }
+    var D = (2*dy)-dx;
+    var y = point1.y;
+
+    var result = [];
+    for(var x = point1.x; x <= point2.x; x++){
+        result.push({x:x,y:y});
+        if(D>0){
+            y += yi;
+            D -= 2*dx;
+        }
+        D += 2*dy;
+    }
     return result;
 }
 
@@ -1458,11 +1485,14 @@ function BresenhamLine(point1, point2){
  * @param {dictionary} point1 
  * @param {dictionary} point2 
  */
-function Raycast(point1, point2){
-    var rayLine = BresenhamLine(point1, point2);
+function Raycast(point1, point2) {
+    var rayLine = Line(point1, point2);
+    if(pointsAreEqual(playerCoords, rayLine[0])){
+        rayLine.reverse();
+    }
     for (var i = rayLine.length - 1; i >= 0; i--) {
         if (!pointIsValid(rayLine[i])) {
-            return rayLine.splice(i);
+            return rayLine.splice(i + 1);
         }
     }
     return rayLine;
