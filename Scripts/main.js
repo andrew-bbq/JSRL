@@ -4,7 +4,7 @@ const DIR_E = 2;
 const DIR_S = 4;
 const DIR_W = 8;
 
-// constant values for getShortestDistance
+// constant values for getShortestPath
 const PATH = 0;
 const DIST = 1;
 const ALL_PATHS = 2;
@@ -91,11 +91,14 @@ function drawGame() {
 
     for (var y = 0; y < renderH; y++) {
         for (var x = 0; x < renderW; x++) {
-            ctx.fillStyle = gameMap[y][x].outlineColor;
-            ctx.fillRect(x * tileW, y * tileH, tileW, tileH);
+
             if (overlay[y][x]) {
+                ctx.fillStyle = blendColors(gameMap[y][x].outlineColor, overlay[y][x]);
+                ctx.fillRect(x * tileW, y * tileH, tileW, tileH);
                 ctx.fillStyle = blendColors(gameMap[y][x].displayColor, overlay[y][x]);
             } else {
+                ctx.fillStyle = gameMap[y][x].outlineColor;
+                ctx.fillRect(x * tileW, y * tileH, tileW, tileH);
                 ctx.fillStyle = gameMap[y][x].displayColor;
             }
             ctx.fillRect(x * tileW + 1, y * tileH + 1, tileW - 2, tileH - 2);
@@ -165,10 +168,10 @@ canvas.addEventListener('mousedown', function (e) {
     } else {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
-        var line = (Raycast(playerCoords, selectorCoords));
+        var explosion = getCircularExplosion(selectorCoords, 5);
         unsetOverlay();
-        for (var i = 0; i < line.length; i++) {
-            overlay[line[i].y][line[i].x] = "#FF0000";
+        for(var i = 0; i < explosion.length; i++) {
+            overlay[explosion[i].y][explosion[i].x] = '#FF0000';
         }
     }
 });
@@ -652,7 +655,7 @@ function toggleContainerUI(toDisplay) {
 function moveAndToggleDoor() {
     toggleContainerUI(RUI_NONE);
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
-    playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
+    playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH, false);
     playerChar.moveQueue.push([ACTION_OPEN, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
 }
@@ -677,7 +680,7 @@ function removeSelector() {
  */
 function moveToSelector() {
     toggleContainerUI(RUI_NONE);
-    playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH);
+    playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH, false);
     gameMap[selectorCoords.y][selectorCoords.x].removeContentByType("Selector");
     document.getElementById("selected-tile").innerHTML = "No tile selected";
     document.getElementById("contents-of-tile").innerHTML = "";
@@ -692,7 +695,7 @@ function moveToSelector() {
 function moveAndLootImpassableSelector() {
     toggleContainerUI(RUI_NONE);
     var closestAdjacentPoint = getAdjacentPointClosestToPlayer(selectorCoords);
-    playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH);
+    playerChar.moveQueue = getShortestPath(playerCoords, closestAdjacentPoint, PATH, false);
     playerChar.moveQueue.push([ACTION_LOOT, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
 }
@@ -702,7 +705,7 @@ function moveAndLootImpassableSelector() {
  */
 function moveAndLootSelector() {
     toggleContainerUI(RUI_NONE);
-    playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH);
+    playerChar.moveQueue = getShortestPath(playerCoords, selectorCoords, PATH, false);
     playerChar.moveQueue.push([ACTION_LOOT, { x: selectorCoords.x, y: selectorCoords.y }]);
     removeSelector();
 }
@@ -716,7 +719,7 @@ function getAdjacentPointClosestToPlayer(point) {
     var minPoint = [MAX_DISTANCE, { x: MAX_DISTANCE, y: MAX_DISTANCE }];
     for (var i = 0; i < 4; i++) {
         var toCheck = { x: point.x + ROW_NUM[i], y: point.y + COL_NUM[i] };
-        var curDist = getShortestPath(playerCoords, toCheck, DIST);
+        var curDist = getShortestPath(playerCoords, toCheck, DIST, false);
         if (curDist < minPoint[0]) {
             minPoint = [curDist, toCheck];
         }
@@ -1311,7 +1314,7 @@ function blendColors(color1, color2) {
  * @param {dictionary} point to check
  */
 function pointIsValid(point) {
-    var isInbounds = (point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH);
+    var isInbounds = pointIsInbounds(point);
     if (!isInbounds) return isInbounds;
     var containsImpassableObject = false;
     for (var i = 0; i < gameMap[point.y][point.x].contents.length; i++) {
@@ -1320,6 +1323,14 @@ function pointIsValid(point) {
         }
     }
     return (isInbounds && gameMap[point.y][point.x].type < 100 && !containsImpassableObject);
+}
+
+/**
+ * Check if point is in the render area
+ * @param {dictionary} point to check
+ */
+function pointIsInbounds(point) {
+    return (point.x >= 0 && point.x < renderW && point.y >= 0 && point.y < renderH);
 }
 
 /**
@@ -1346,7 +1357,7 @@ function pointToString(point) {
 const MAX_DISTANCE = 123456;
 const COL_NUM = [-1, 1, 0, 0];
 const ROW_NUM = [0, 0, -1, 1];
-function getShortestPath(point1, point2, returnType) {
+function getShortestPath(point1, point2, returnType, disregardImpassable) {
     var dist = [];
     var visited = [];
     var minPaths = [];
@@ -1371,8 +1382,10 @@ function getShortestPath(point1, point2, returnType) {
 
     while (queue.length) {
         var current = queue.shift();
-        if (!pointIsValid(current) && !pointsAreEqual(current, playerCoords)) {
-            continue;
+        if (!pointsAreEqual(current, playerCoords)) {
+            if (!pointIsValid(current) || !disregardImpassable) {
+                continue;
+            }
         }
         visited[current.y][current.x] = true;
         adjacentNodes = [];
@@ -1380,12 +1393,14 @@ function getShortestPath(point1, point2, returnType) {
             adjacentNodes.push({ x: current.x + ROW_NUM[i], y: current.y + COL_NUM[i] });
         }
         for (var i = 0; i < adjacentNodes.length; i++) {
-            if (pointIsValid(adjacentNodes[i]) && dist[adjacentNodes[i].y][adjacentNodes[i].x] > dist[current.y][current.x] + 1) {
-                dist[adjacentNodes[i].y][adjacentNodes[i].x] = dist[current.y][current.x] + 1;
-                toAdd = [...minPaths[current.y][current.x]];
-                toAdd.push(adjacentNodes[i]);
-                minPaths[adjacentNodes[i].y][adjacentNodes[i].x] = toAdd;
-                queue.push(adjacentNodes[i]);
+            if (pointIsValid(adjacentNodes[i]) || (disregardImpassable && pointIsInbounds(adjacentNodes[i]))) {
+                if (dist[adjacentNodes[i].y][adjacentNodes[i].x] > dist[current.y][current.x] + 1) {
+                    dist[adjacentNodes[i].y][adjacentNodes[i].x] = dist[current.y][current.x] + 1;
+                    toAdd = [...minPaths[current.y][current.x]];
+                    toAdd.push(adjacentNodes[i]);
+                    minPaths[adjacentNodes[i].y][adjacentNodes[i].x] = toAdd;
+                    queue.push(adjacentNodes[i]);
+                }
             }
         }
     }
@@ -1394,7 +1409,7 @@ function getShortestPath(point1, point2, returnType) {
             return minPaths[point2.y][point2.x];
         case DIST:
             return dist[point2.y][point2.x];
-        case ALL_PATHs:
+        case ALL_PATHS:
             return minPaths;
         case ALL_DISTS:
             return dist;
@@ -1408,18 +1423,18 @@ function getShortestPath(point1, point2, returnType) {
  * @param {dictionary} point1 
  * @param {dictionary} point2 
  */
-function Line(point1,point2){
-    if (Math.abs(point2.y - point1.y) < Math.abs(point2.x - point1.x)){
-        if (point1.x > point2.x){
-            return LowLine(point2, point1);
+function line(point1, point2) {
+    if (Math.abs(point2.y - point1.y) < Math.abs(point2.x - point1.x)) {
+        if (point1.x > point2.x) {
+            return lowLine(point2, point1);
         } else {
-            return LowLine(point1, point2);
+            return lowLine(point1, point2);
         }
     } else {
         if (point1.y > point2.y) {
-            return HighLine(point2, point1);
+            return highLine(point2, point1);
         } else {
-            return HighLine(point1, point2);
+            return highLine(point1, point2);
         }
     }
 }
@@ -1429,7 +1444,7 @@ function Line(point1,point2){
  * @param {dictionary} point1 
  * @param {dictionary} point2 
  */
-function HighLine(point1, point2) {
+function highLine(point1, point2) {
     var dx = point2.x - point1.x;
     var dy = point2.y - point1.y;
     xi = 1;
@@ -1437,17 +1452,17 @@ function HighLine(point1, point2) {
         xi = -1;
         dx = -dx;
     }
-    var D = (2*dx)-dy;
+    var D = (2 * dx) - dy;
     var x = point1.x;
 
     var result = [];
-    for (var y = point1.y; y <= point2.y; y++){
-        result.push({x:x,y:y});
-        if (D>0){
+    for (var y = point1.y; y <= point2.y; y++) {
+        result.push({ x: x, y: y });
+        if (D > 0) {
             x += xi;
-            D -= 2*dy;
+            D -= 2 * dy;
         }
-        D += 2*dx;
+        D += 2 * dx;
     }
     return result;
 }
@@ -1457,25 +1472,25 @@ function HighLine(point1, point2) {
  * @param {dictionary} point1 
  * @param {dictionary} point2 
  */
-function LowLine(point1, point2) {
+function lowLine(point1, point2) {
     var dx = point2.x - point1.x;
     var dy = point2.y - point1.y;
     var yi = 1;
-    if (dy < 0){
+    if (dy < 0) {
         yi = -1;
         dy = -dy;
     }
-    var D = (2*dy)-dx;
+    var D = (2 * dy) - dx;
     var y = point1.y;
 
     var result = [];
-    for(var x = point1.x; x <= point2.x; x++){
-        result.push({x:x,y:y});
-        if(D>0){
+    for (var x = point1.x; x <= point2.x; x++) {
+        result.push({ x: x, y: y });
+        if (D > 0) {
             y += yi;
-            D -= 2*dx;
+            D -= 2 * dx;
         }
-        D += 2*dy;
+        D += 2 * dy;
     }
     return result;
 }
@@ -1485,17 +1500,53 @@ function LowLine(point1, point2) {
  * @param {dictionary} point1 
  * @param {dictionary} point2 
  */
-function Raycast(point1, point2) {
-    var rayLine = Line(point1, point2);
-    if(pointsAreEqual(playerCoords, rayLine[0])){
+function raycast(point1, point2) {
+    var rayLine = line(point1, point2);
+    if (pointsAreEqual(playerCoords, rayLine[0])) {
         rayLine.reverse();
     }
     for (var i = rayLine.length - 1; i >= 0; i--) {
         if (!pointIsValid(rayLine[i])) {
+            rayLine.pop();
             return rayLine.splice(i + 1);
         }
     }
+    rayLine.pop();
     return rayLine;
+}
+
+/**
+ * Get outline of a circle centered on a point with a given radius
+ * @param {dictionary} center center of the circle
+ * @param {int} radius of circle to get points for
+ */
+function getCircle(center, radius) {
+    
+}
+
+/**
+ * Get all spaces in a circular area affected by an aoe ability
+ * @param {dictionary} center center of the aoe circle
+ * @param {int} radius of aoe
+ */
+function getCircularExplosion(center, radius) {
+    var outline = getCircle(center, radius);
+    var result = [];
+    console.log(outline);
+    for(var i = 0; i < outline.length; i++){
+        result = mergeArrays(result, raycast(center, outline[i]));
+    }
+    return result;
+}
+
+/**
+ * Unionize two arrays
+ * @param {array} array1 
+ * @param {array} array2 
+ */
+function mergeArrays(x, y) {
+    var joinedArray = [...x, ...y];
+    return joinedArray.filter((item,index) => joinedArray.indexOf(item) === index);
 }
 
 var playerChar = new Player();
