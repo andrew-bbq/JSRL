@@ -168,11 +168,11 @@ canvas.addEventListener('mousedown', function (e) {
     } else {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
-        var explosion = getCircularExplosion(selectorCoords, 5);
+        /**var explosion = getCircularExplosion(selectorCoords, 5);
         unsetOverlay();
         for(var i = 0; i < explosion.length; i++) {
             overlay[explosion[i].y][explosion[i].x] = '#FF0000';
-        }
+        }*/
     }
 });
 
@@ -1357,7 +1357,7 @@ function pointToString(point) {
 const MAX_DISTANCE = 123456;
 const COL_NUM = [-1, 1, 0, 0];
 const ROW_NUM = [0, 0, -1, 1];
-function getShortestPath(point1, point2, returnType, disregardImpassable) {
+function getShortestPath(point1, point2, returnType) {
     var dist = [];
     var visited = [];
     var minPaths = [];
@@ -1382,10 +1382,8 @@ function getShortestPath(point1, point2, returnType, disregardImpassable) {
 
     while (queue.length) {
         var current = queue.shift();
-        if (!pointsAreEqual(current, playerCoords)) {
-            if (!pointIsValid(current) || !disregardImpassable) {
-                continue;
-            }
+        if (!pointIsValid(current) && !pointsAreEqual(current, playerCoords)) {
+            continue;
         }
         visited[current.y][current.x] = true;
         adjacentNodes = [];
@@ -1393,14 +1391,12 @@ function getShortestPath(point1, point2, returnType, disregardImpassable) {
             adjacentNodes.push({ x: current.x + ROW_NUM[i], y: current.y + COL_NUM[i] });
         }
         for (var i = 0; i < adjacentNodes.length; i++) {
-            if (pointIsValid(adjacentNodes[i]) || (disregardImpassable && pointIsInbounds(adjacentNodes[i]))) {
-                if (dist[adjacentNodes[i].y][adjacentNodes[i].x] > dist[current.y][current.x] + 1) {
-                    dist[adjacentNodes[i].y][adjacentNodes[i].x] = dist[current.y][current.x] + 1;
-                    toAdd = [...minPaths[current.y][current.x]];
-                    toAdd.push(adjacentNodes[i]);
-                    minPaths[adjacentNodes[i].y][adjacentNodes[i].x] = toAdd;
-                    queue.push(adjacentNodes[i]);
-                }
+            if (pointIsValid(adjacentNodes[i]) && dist[adjacentNodes[i].y][adjacentNodes[i].x] > dist[current.y][current.x] + 1) {
+                dist[adjacentNodes[i].y][adjacentNodes[i].x] = dist[current.y][current.x] + 1;
+                toAdd = [...minPaths[current.y][current.x]];
+                toAdd.push(adjacentNodes[i]);
+                minPaths[adjacentNodes[i].y][adjacentNodes[i].x] = toAdd;
+                queue.push(adjacentNodes[i]);
             }
         }
     }
@@ -1521,7 +1517,7 @@ function raycast(point1, point2) {
  * @param {int} radius of circle to get points for
  */
 function getCircle(center, radius) {
-    
+
 }
 
 /**
@@ -1533,7 +1529,7 @@ function getCircularExplosion(center, radius) {
     var outline = getCircle(center, radius);
     var result = [];
     console.log(outline);
-    for(var i = 0; i < outline.length; i++){
+    for (var i = 0; i < outline.length; i++) {
         result = mergeArrays(result, raycast(center, outline[i]));
     }
     return result;
@@ -1546,7 +1542,7 @@ function getCircularExplosion(center, radius) {
  */
 function mergeArrays(x, y) {
     var joinedArray = [...x, ...y];
-    return joinedArray.filter((item,index) => joinedArray.indexOf(item) === index);
+    return joinedArray.filter((item, index) => joinedArray.indexOf(item) === index);
 }
 
 var playerChar = new Player();
