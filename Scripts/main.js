@@ -168,11 +168,6 @@ canvas.addEventListener('mousedown', function (e) {
     } else {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
-        /**var explosion = getCircularExplosion(selectorCoords, 5);
-        unsetOverlay();
-        for(var i = 0; i < explosion.length; i++) {
-            overlay[explosion[i].y][explosion[i].x] = '#FF0000';
-        }*/
     }
 });
 
@@ -1498,7 +1493,7 @@ function lowLine(point1, point2) {
  */
 function raycast(point1, point2) {
     var rayLine = line(point1, point2);
-    if (pointsAreEqual(playerCoords, rayLine[0])) {
+    if (pointsAreEqual(point1, rayLine[0])) {
         rayLine.reverse();
     }
     for (var i = rayLine.length - 1; i >= 0; i--) {
@@ -1517,7 +1512,29 @@ function raycast(point1, point2) {
  * @param {int} radius of circle to get points for
  */
 function getCircle(center, radius) {
+    var result = [];
+    var x = radius;
+    var y = 0;
+    var radiusError = 1 - x;
+    while (x >= y) {
+        result.push({ x: x + center.x, y: y + center.y });
+        result.push({ x: y + center.x, y: x + center.y });
+        result.push({ x: -x + center.x, y: y + center.y });
+        result.push({ x: -y + center.x, y: x + center.y });
+        result.push({ x: x + center.x, y: -y + center.y });
+        result.push({ x: y + center.x, y: -x + center.y });
+        result.push({ x: -x + center.x, y: -y + center.y });
+        result.push({ x: -y + center.x, y: -x + center.y });
+        y++;
 
+        if (radiusError < 0) {
+            radiusError += 2 * y + 1;
+        } else {
+            x--;
+            radiusError += 2 * (y - x + 1);
+        }
+    }
+    return result;
 }
 
 /**
@@ -1528,7 +1545,6 @@ function getCircle(center, radius) {
 function getCircularExplosion(center, radius) {
     var outline = getCircle(center, radius);
     var result = [];
-    console.log(outline);
     for (var i = 0; i < outline.length; i++) {
         result = mergeArrays(result, raycast(center, outline[i]));
     }
