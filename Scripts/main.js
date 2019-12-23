@@ -177,7 +177,7 @@ canvas.addEventListener('mousedown', function (e) {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
         unsetOverlay();
-        var explosion = mergeArrays(getCircle(selectorCoords, 5), getCircle(selectorCoords, 4));
+        var explosion = getCircularExplosion(selectorCoords, 6);
         for(var i = 0; i < explosion.length; i++){
             if(pointIsInbounds(explosion[i])){
                 overlay[explosion[i].y][explosion[i].x] = "#FF0000";
@@ -1559,7 +1559,19 @@ function getCircle(center, radius) {
  */
 function getCircularExplosion(center, radius) {
     var outline = getCircle(center, radius);
-    outline = mergeArrays(outline, getCircle(center, Math.max(0, radius-1)));
+    // make the outline a bit thicker since raycasting on such a thin boy doesn't fill it out all the way depending on the radius
+    for(var i = 0; i < outline.length; i++) {
+        var slope = (outline[i].y - center.y) / (outline[i].x - center.x);
+        if(slope > 0.5 && outline[i].y > center.y){
+            outline.push({x: outline[i].x, y: outline[i].y - 1});
+        } else if (slope > 0.5 && outline[i].y < center.y){
+            outline.push({x: outline[i].x, y: outline[i].y + 1});
+        } else if (slope < 0.5 && outline[i].x > center.x){
+            outline.push({x: outline[i].x - 1, y: outline[i].y});
+        } else if (slope < 0.5 && outline[i].x < center.x){
+            outline.push({x: outline[i].x + 1, y: outline[i].y});
+        }
+    }
     var result = [];
     for (var i = 0; i < outline.length; i++) {
         result = mergeArrays(result, raycast(center, outline[i]));
