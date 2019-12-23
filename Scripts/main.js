@@ -176,6 +176,13 @@ canvas.addEventListener('mousedown', function (e) {
     } else {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
+        unsetOverlay();
+        var explosion = mergeArrays(getCircle(selectorCoords, 5), getCircle(selectorCoords, 4));
+        for(var i = 0; i < explosion.length; i++){
+            if(pointIsInbounds(explosion[i])){
+                overlay[explosion[i].y][explosion[i].x] = "#FF0000";
+            }
+        }
     }
 });
 
@@ -1552,6 +1559,7 @@ function getCircle(center, radius) {
  */
 function getCircularExplosion(center, radius) {
     var outline = getCircle(center, radius);
+    outline = mergeArrays(outline, getCircle(center, Math.max(0, radius-1)));
     var result = [];
     for (var i = 0; i < outline.length; i++) {
         result = mergeArrays(result, raycast(center, outline[i]));
@@ -1670,8 +1678,8 @@ function fillRectangle(corner1, corner2, tileFunction) {
     }
 }
 
-playerChar.inventory.push(new Equip("Sword of the Stinky", RARITY_EPIC, ARMOR_ONEHAND, "The stinkiest sword to ever grace humanity", "Images/none.png", 0));
-playerChar.inventory.push(new Equip("Poopy Claymore", RARITY_UNCOMMON, ARMOR_TWOHAND, "Big poop sword", "Images/none.png", 0));
+playerChar.inventory.push(new Equip("Sword", RARITY_EPIC, ARMOR_ONEHAND, "Test sword", "Images/none.png", 0));
+playerChar.inventory.push(new Equip("Claymore", RARITY_UNCOMMON, ARMOR_TWOHAND, "A two-handed weapon", "Images/none.png", 0));
 playerChar.inventory.push(new Equip("Ring", RARITY_EPIC, ARMOR_RING, "A ring lol", "Images/none.png", 0));
 
 
