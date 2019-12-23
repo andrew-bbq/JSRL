@@ -56,6 +56,11 @@ const UI_TILE = 4;
 const RUI_NONE = 0;
 const RUI_LOOT = 1;
 
+// constant values for spell types
+const SPELL_DAMAGE = 0;
+const SPELL_HEAL = 1;
+const SPELL_TERRAIN = 2;
+
 // context for game (initialized null)
 var ctx = null;
 
@@ -68,6 +73,9 @@ var currentSecond = 0, frameCount = 0, framesLastSecond = 0;
 var selectorCoords = { x: null, y: null };
 var playerCoords = { x: null, y: null };
 var combatQueue = [];
+
+// will be used for objects like fire that need to deal damage every tick but we don't want to check every tile
+var updateQueue = [];
 
 // more game info
 var tick = 0;
