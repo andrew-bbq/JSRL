@@ -61,6 +61,9 @@ const SPELL_DAMAGE = 0;
 const SPELL_HEAL = 1;
 const SPELL_TERRAIN = 2;
 
+// constant value for how far NPCs can see
+const VISION_RADIUS = 8;
+
 // context for game (initialized null)
 var ctx = null;
 
@@ -73,6 +76,7 @@ var currentSecond = 0, frameCount = 0, framesLastSecond = 0;
 var selectorCoords = { x: null, y: null };
 var playerCoords = { x: null, y: null };
 var combatQueue = [];
+var inCombat = false;
 
 // will be used for objects like fire that need to deal damage every tick but we don't want to check every tile
 var updateQueue = [];
@@ -177,7 +181,7 @@ canvas.addEventListener('mousedown', function (e) {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
         unsetOverlay();
-        var explosion = getCircularExplosion(selectorCoords, 6);
+        var explosion = getCircularExplosion(selectorCoords, 8);
         for(var i = 0; i < explosion.length; i++){
             if(pointIsInbounds(explosion[i])){
                 overlay[explosion[i].y][explosion[i].x] = "#FF0000";
@@ -854,12 +858,14 @@ class WorldObject {
     outline = false;
     containsLoot = false;
     impassable = false;
+    isPerson = false;
     constructor(priority, color, outline, lootable, impassable) {
         this.priority = priority;
         this.color = color;
         this.outline = outline;
         this.containsLoot = lootable;
         this.impassable = impassable;
+        this.isPerson = false;
     }
 
     typeString() {
@@ -985,6 +991,8 @@ class Character extends WorldObject {
 
         this.gender = Math.floor(Math.random() * 2);
         this.name = generateName(this.gender) + " " + generateName(2);
+        
+        this.isPerson = true;
     }
 
     typeString() {
@@ -1322,17 +1330,23 @@ function blendColors(color1, color2) {
 /**
  * Check if point is both inbounds and not a wall/impassable tile
  * @param {dictionary} point to check
+ * @param {bool} ignorePeople if we consider characters as passable (false if impassable) (defaults to false)
+ * @param {bool} goOverLow if we should consider low impassable terrain to be impassable, such as ocean, for projectiles usually (defaults to false)
  */
-function pointIsValid(point) {
+function pointIsValid(point, ignorePeople = false, goOverLow = false) {
     var isInbounds = pointIsInbounds(point);
     if (!isInbounds) return isInbounds;
     var containsImpassableObject = false;
     for (var i = 0; i < gameMap[point.y][point.x].contents.length; i++) {
         if (gameMap[point.y][point.x].contents[i].impassable && gameMap[point.y][point.x].contents[i].typeString() !== "Player") {
-            containsImpassableObject = true;
+            if (!ignorePeople || !gameMap[point.y][point.x].contents[i].isPerson){
+                containsImpassableObject = true;
+            }
         }
     }
-    return (isInbounds && gameMap[point.y][point.x].type < 100 && !containsImpassableObject);
+    var passTerrain = gameMap[point.y][point.x].type < 100 || (goOverLow && gameMap[point.y][point.x].type > 1000);
+    
+    return (isInbounds && passTerrain && !containsImpassableObject);
 }
 
 /**
@@ -1505,14 +1519,15 @@ function lowLine(point1, point2) {
  * Get line from point1 to point2 without crossing traversable terrain using BresenhamLine()
  * @param {dictionary} point1 
  * @param {dictionary} point2 
+ * @param {bool} ignorePeople whether or not people should be considered impassable (false for impassable)
  */
-function raycast(point1, point2) {
+function raycast(point1, point2, ignorePeople = false, goOverLow = false) {
     var rayLine = line(point1, point2);
     if (pointsAreEqual(point1, rayLine[0])) {
         rayLine.reverse();
     }
     for (var i = rayLine.length - 1; i >= 0; i--) {
-        if (!pointIsValid(rayLine[i])) {
+        if (!pointIsValid(rayLine[i], ignorePeople, goOverLow)) {
             rayLine.pop();
             return rayLine.splice(i + 1);
         }
@@ -1559,6 +1574,7 @@ function getCircle(center, radius) {
  */
 function getCircularExplosion(center, radius) {
     var outline = getCircle(center, radius);
+    outline.push(center);
     // make the outline a bit thicker since raycasting on such a thin boy doesn't fill it out all the way depending on the radius
     for(var i = outline.length - 1; i >= 0; i--) {
         var slope = (outline[i].y - center.y) / (outline[i].x - center.x);
@@ -1574,7 +1590,7 @@ function getCircularExplosion(center, radius) {
     }
     var result = [];
     for (var i = 0; i < outline.length; i++) {
-        result = mergeArrays(result, raycast(center, outline[i]));
+        result = mergeArrays(result, raycast(center, outline[i], true, true));
     }
     return result;
 }
@@ -1660,7 +1676,7 @@ function newStoneTile() {
     return new Tile(1, [], "#A0A0A0", "Stone Floor");
 }
 function newOceanTile() {
-    return new Tile(101, [], "#5050BB", "Ocean")
+    return new Tile(1001, [], "#5050BB", "Ocean")
 }
 
 function placeRectangle(corner1, corner2, tileFunction) {
@@ -1694,5 +1710,7 @@ playerChar.inventory.push(new Equip("Sword", RARITY_EPIC, ARMOR_ONEHAND, "Test s
 playerChar.inventory.push(new Equip("Claymore", RARITY_UNCOMMON, ARMOR_TWOHAND, "A two-handed weapon", "Images/none.png", 0));
 playerChar.inventory.push(new Equip("Ring", RARITY_EPIC, ARMOR_RING, "A ring lol", "Images/none.png", 0));
 
+gameMap[20][5].contents.push(new Character());
+gameMap[20][5].updateOverride();
 
 updateInventoryDisplay();
