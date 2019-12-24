@@ -1560,7 +1560,7 @@ function getCircle(center, radius) {
 function getCircularExplosion(center, radius) {
     var outline = getCircle(center, radius);
     // make the outline a bit thicker since raycasting on such a thin boy doesn't fill it out all the way depending on the radius
-    for(var i = 0; i < outline.length; i++) {
+    for(var i = outline.length - 1; i >= 0; i--) {
         var slope = (outline[i].y - center.y) / (outline[i].x - center.x);
         if(slope > 0.5 && outline[i].y > center.y){
             outline.push({x: outline[i].x, y: outline[i].y - 1});
