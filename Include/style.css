@@ -34,3 +34,8 @@
 button {
     max-width: 60px;
 }
+
+body {
+    background-color: darkslategrey;
+    color: lightgrey;
+}

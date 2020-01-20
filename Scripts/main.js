@@ -77,6 +77,7 @@ var selectorCoords = { x: null, y: null };
 var playerCoords = { x: null, y: null };
 var combatQueue = [];
 var inCombat = false;
+var casting = false;
 
 // will be used for objects like fire that need to deal damage every tick but we don't want to check every tile
 var updateQueue = [];
@@ -175,9 +176,9 @@ canvas.addEventListener('mousedown', function (e) {
     clickLocation = getCursorPosition(canvas, e);
     squareX = Math.floor(clickLocation.x / tileW);
     squareY = Math.floor(clickLocation.y / tileH);
-    if (squareX == selectorCoords.x && squareY == selectorCoords.y) {
+    if (squareX == selectorCoords.x && squareY == selectorCoords.y && !casting) {
         moveToSelector();
-    } else {
+    } else if (!casting) {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
         unsetOverlay();
@@ -187,6 +188,8 @@ canvas.addEventListener('mousedown', function (e) {
                 overlay[explosion[i].y][explosion[i].x] = "#FF0000";
             }
         }
+    } else {
+        // we're casting a spell
     }
 });
 
@@ -257,6 +260,10 @@ function moveSelector(squareX, squareY) {
     updateSelectorText();
 }
 
+/**
+ * Update health/resource information for character (bottom left UI element)
+ * Call whenever character heals, takes damage, uses mana or recovers mana
+ */
 function updateHealthDisplay() {
     document.getElementById("health-total").innerHTML = "HP: " + playerChar.hp + "/" + playerChar.maxhp;
     document.getElementById("mana").innerHTML = "MANA: " + playerChar.mana + "/" + playerChar.maxmana;
@@ -328,6 +335,8 @@ function getContainerObjectOptions(index, coords) {
 
 // could probably consolidate into a single getEquipButton with a function name, hand index, and button text field, 
 // but then that would move work up into the code above and I already have this stuff written so it's w/e for now
+// Eh whatever, I'll write a TODO here, if I get to it I get to it but it's low priority right now.
+// TODO: Consolidate all button functions into a single button function that has a function name, hand index, and button text parameter.
 
 // --------------------- BUTTON SECTION --------------------------------------------
 
@@ -454,7 +463,8 @@ function equipItem(index, hand) {
  * @param {int} hand hand to equip item in (1 for right, 2 for left)
  */
 function equipItemFromContainer(index, coords, hand) {
-    var item = gameMap[coords.y][coords.x].getFirstLootableObject().inventory[index];
+    var container = gameMap[coords.y][coords.x].getFirstLootableObject();
+    var item = container.inventory[index];
     if (hand == 0) {
         var type = item.armorType;
         if (playerChar.equipment[type] != null) {
@@ -487,10 +497,14 @@ function equipItemFromContainer(index, coords, hand) {
             playerChar.equipment[ARMOR_RIGHTHAND] = item;
         }
     }
-    gameMap[coords.y][coords.x].getFirstLootableObject().inventory.splice(index, 1);
+    container.inventory.splice(index, 1);
     updateInventoryDisplay();
     updateEquipUI();
     toggleUI(UI_EQUIP);
+    if (container.inventory.length == 0 && container.typeString() == "Dropped Items") {
+        gameMap[coords.y][coords.x].removeContentByType("Dropped Items");
+        toggleContainerUI(RUI_NONE);
+    }
 }
 
 /**
@@ -608,6 +622,8 @@ function pickupItem(index, coords) {
         gameMap[coords.y][coords.x].removeContentByType("Dropped Items");
         toggleContainerUI(RUI_NONE);
     }
+    updateSelectorText();
+    toggleUI(UI_TILE);
 }
 
 /**
@@ -750,14 +766,15 @@ const skills = {
     axe: [],
     spear: [],
     bow: [],
-    fire: [{ name: "Fireball", range: 10 }],
+    fire: [{ name: "Fireball", range: 10, radius: 2, spelltype: SPELL_DAMAGE, id: 0, cost: 5, terrainfunction: "newFlameTile" }],
     water: [],
     air: [],
     earth: [],
-    white: [],
-    dark: [],
+    light: [],
+    spirit: [],
 }
 
+// stat distribution: [Constitution, Strength, Dexterity, Intelligence, Physical Armor, Magical Armor]
 const races = [
     ["Human", [7, 7, 7, 7, 4, 7]],
     ["Lizard", [7, 7, 4, 7, 10, 4]],
@@ -873,6 +890,18 @@ class WorldObject {
     }
 }
 
+class Projectile extends WorldObject{
+    path = [];
+    constructor(path, color) {
+        super(10, color, false, false, false);
+        this.path = path;
+    }
+
+    typeString() {
+        return "Projectile";
+    }
+}
+
 class Chest extends WorldObject {
     inventory = [];
 
@@ -962,6 +991,10 @@ class Character extends WorldObject {
     equipment = {};
 
     inventory = [];
+    abilities = [];
+
+    hostile = false;
+    moveQueue = [];
 
     constructor() {
         super(1000, "#AA00AA", false, false, true);
@@ -1001,6 +1034,10 @@ class Character extends WorldObject {
 }
 
 class Enemy extends Character {
+    constructor() {
+        super();
+        this.hostile = true;
+    }
 
     typeString() {
         return "Enemy";
@@ -1376,7 +1413,7 @@ function pointToString(point) {
 
 /**
  * Djikstra's min-path algorithm, can be improved by caching the min-path array but I'll worry about that when performance is bad 
- * (Djikstra's on a 25x25 grid hopefully shouldn't be an issue in 2019)
+ * (Djikstra's on a 25x25 grid hopefully shouldn't be an issue in 2019) (Oh my god it's 2020)
  */
 const MAX_DISTANCE = 123456;
 const COL_NUM = [-1, 1, 0, 0];
@@ -1677,6 +1714,9 @@ function newStoneTile() {
 }
 function newOceanTile() {
     return new Tile(1001, [], "#5050BB", "Ocean")
+}
+function newFlameTile(){
+    return new Tile(50, [], "#AA3333", "Flame");
 }
 
 function placeRectangle(corner1, corner2, tileFunction) {
