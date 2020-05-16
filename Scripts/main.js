@@ -56,6 +56,14 @@ const UI_TILE = 4;
 const RUI_NONE = 0;
 const RUI_LOOT = 1;
 
+// constant values for spell types
+const SPELL_DAMAGE = 0;
+const SPELL_HEAL = 1;
+const SPELL_TERRAIN = 2;
+
+// constant value for how far NPCs can see
+const VISION_RADIUS = 8;
+
 // context for game (initialized null)
 var ctx = null;
 
@@ -68,6 +76,11 @@ var currentSecond = 0, frameCount = 0, framesLastSecond = 0;
 var selectorCoords = { x: null, y: null };
 var playerCoords = { x: null, y: null };
 var combatQueue = [];
+var inCombat = false;
+var casting = false;
+
+// will be used for objects like fire that need to deal damage every tick but we don't want to check every tile
+var updateQueue = [];
 
 // more game info
 var tick = 0;
@@ -166,16 +179,20 @@ canvas.addEventListener('mousedown', function (e) {
     clickLocation = getCursorPosition(canvas, e);
     squareX = Math.floor(clickLocation.x / tileW);
     squareY = Math.floor(clickLocation.y / tileH);
-    if (squareX == selectorCoords.x && squareY == selectorCoords.y) {
+    if (squareX == selectorCoords.x && squareY == selectorCoords.y && !casting) {
         moveToSelector();
-    } else {
+    } else if (!casting) {
         toggleUI(UI_TILE);
         moveSelector(squareX, squareY);
-        /**var explosion = getCircularExplosion(selectorCoords, 5);
         unsetOverlay();
-        for(var i = 0; i < explosion.length; i++) {
-            overlay[explosion[i].y][explosion[i].x] = '#FF0000';
-        }*/
+        var explosion = getCircularExplosion(selectorCoords, 8);
+        for(var i = 0; i < explosion.length; i++){
+            if(pointIsInbounds(explosion[i])){
+                overlay[explosion[i].y][explosion[i].x] = "#FF0000";
+            }
+        }
+    } else {
+        // we're casting a spell
     }
 });
 
@@ -246,6 +263,10 @@ function moveSelector(squareX, squareY) {
     updateSelectorText();
 }
 
+/**
+ * Update health/resource information for character (bottom left UI element)
+ * Call whenever character heals, takes damage, uses mana or recovers mana
+ */
 function updateHealthDisplay() {
     document.getElementById("health-total").innerHTML = "HP: " + playerChar.hp + "/" + playerChar.maxhp;
     document.getElementById("mana").innerHTML = "MANA: " + playerChar.mana + "/" + playerChar.maxmana;
@@ -330,6 +351,8 @@ function getContainerObjectOptions(index, coords) {
 
 // could probably consolidate into a single getEquipButton with a function name, hand index, and button text field, 
 // but then that would move work up into the code above and I already have this stuff written so it's w/e for now
+// Eh whatever, I'll write a TODO here, if I get to it I get to it but it's low priority right now.
+// TODO: Consolidate all button functions into a single button function that has a function name, hand index, and button text parameter.
 
 // --------------------- BUTTON SECTION --------------------------------------------
 
@@ -456,7 +479,8 @@ function equipItem(index, hand) {
  * @param {int} hand hand to equip item in (1 for right, 2 for left)
  */
 function equipItemFromContainer(index, coords, hand) {
-    var item = gameMap[coords.y][coords.x].getFirstLootableObject().inventory[index];
+    var container = gameMap[coords.y][coords.x].getFirstLootableObject();
+    var item = container.inventory[index];
     if (hand == 0) {
         var type = item.armorType;
         if (playerChar.equipment[type] != null) {
@@ -489,10 +513,14 @@ function equipItemFromContainer(index, coords, hand) {
             playerChar.equipment[ARMOR_RIGHTHAND] = item;
         }
     }
-    gameMap[coords.y][coords.x].getFirstLootableObject().inventory.splice(index, 1);
+    container.inventory.splice(index, 1);
     updateInventoryDisplay();
     updateEquipUI();
     toggleUI(UI_EQUIP);
+    if (container.inventory.length == 0 && container.typeString() == "Dropped Items") {
+        gameMap[coords.y][coords.x].removeContentByType("Dropped Items");
+        toggleContainerUI(RUI_NONE);
+    }
 }
 
 /**
@@ -610,6 +638,8 @@ function pickupItem(index, coords) {
         gameMap[coords.y][coords.x].removeContentByType("Dropped Items");
         toggleContainerUI(RUI_NONE);
     }
+    updateSelectorText();
+    toggleUI(UI_TILE);
 }
 
 /**
@@ -752,14 +782,15 @@ const skills = {
     axe: [],
     spear: [],
     bow: [],
-    fire: [{ name: "Fireball", range: 10 }],
+    fire: [{ name: "Fireball", range: 10, radius: 2, spelltype: SPELL_DAMAGE, id: 0, cost: 5, terrainfunction: "newFlameTile" }],
     water: [],
     air: [],
     earth: [],
-    white: [],
-    dark: [],
+    light: [],
+    spirit: [],
 }
 
+// stat distribution: [Constitution, Strength, Dexterity, Intelligence, Physical Armor, Magical Armor]
 const races = [
     ["Human", [7, 7, 7, 7, 4, 7]],
     ["Lizard", [7, 7, 4, 7, 10, 4]],
@@ -860,16 +891,30 @@ class WorldObject {
     outline = false;
     containsLoot = false;
     impassable = false;
+    isPerson = false;
     constructor(priority, color, outline, lootable, impassable) {
         this.priority = priority;
         this.color = color;
         this.outline = outline;
         this.containsLoot = lootable;
         this.impassable = impassable;
+        this.isPerson = false;
     }
 
     typeString() {
         return "WorldObject";
+    }
+}
+
+class Projectile extends WorldObject{
+    path = [];
+    constructor(path, color) {
+        super(10, color, false, false, false);
+        this.path = path;
+    }
+
+    typeString() {
+        return "Projectile";
     }
 }
 
@@ -962,6 +1007,10 @@ class Character extends WorldObject {
     equipment = {};
 
     inventory = [];
+    abilities = [];
+
+    hostile = false;
+    moveQueue = [];
 
     constructor() {
         super(1000, "#AA00AA", false, false, true);
@@ -991,6 +1040,8 @@ class Character extends WorldObject {
 
         this.gender = Math.floor(Math.random() * 2);
         this.name = generateName(this.gender) + " " + generateName(2);
+        
+        this.isPerson = true;
     }
 
     typeString() {
@@ -999,6 +1050,10 @@ class Character extends WorldObject {
 }
 
 class Enemy extends Character {
+    constructor() {
+        super();
+        this.hostile = true;
+    }
 
     typeString() {
         return "Enemy";
@@ -1328,17 +1383,23 @@ function blendColors(color1, color2) {
 /**
  * Check if point is both inbounds and not a wall/impassable tile
  * @param {dictionary} point to check
+ * @param {bool} ignorePeople if we consider characters as passable (false if impassable) (defaults to false)
+ * @param {bool} goOverLow if we should consider low impassable terrain to be impassable, such as ocean, for projectiles usually (defaults to false)
  */
-function pointIsValid(point) {
+function pointIsValid(point, ignorePeople = false, goOverLow = false) {
     var isInbounds = pointIsInbounds(point);
     if (!isInbounds) return isInbounds;
     var containsImpassableObject = false;
     for (var i = 0; i < gameMap[point.y][point.x].contents.length; i++) {
         if (gameMap[point.y][point.x].contents[i].impassable && gameMap[point.y][point.x].contents[i].typeString() !== "Player") {
-            containsImpassableObject = true;
+            if (!ignorePeople || !gameMap[point.y][point.x].contents[i].isPerson){
+                containsImpassableObject = true;
+            }
         }
     }
-    return (isInbounds && gameMap[point.y][point.x].type < 100 && !containsImpassableObject);
+    var passTerrain = gameMap[point.y][point.x].type < 100 || (goOverLow && gameMap[point.y][point.x].type > 1000);
+    
+    return (isInbounds && passTerrain && !containsImpassableObject);
 }
 
 /**
@@ -1368,7 +1429,7 @@ function pointToString(point) {
 
 /**
  * Djikstra's min-path algorithm, can be improved by caching the min-path array but I'll worry about that when performance is bad 
- * (Djikstra's on a 25x25 grid hopefully shouldn't be an issue in 2019)
+ * (Djikstra's on a 25x25 grid hopefully shouldn't be an issue in 2019) (Oh my god it's 2020)
  */
 const MAX_DISTANCE = 123456;
 const COL_NUM = [-1, 1, 0, 0];
@@ -1511,14 +1572,15 @@ function lowLine(point1, point2) {
  * Get line from point1 to point2 without crossing traversable terrain using BresenhamLine()
  * @param {dictionary} point1 
  * @param {dictionary} point2 
+ * @param {bool} ignorePeople whether or not people should be considered impassable (false for impassable)
  */
-function raycast(point1, point2) {
+function raycast(point1, point2, ignorePeople = false, goOverLow = false) {
     var rayLine = line(point1, point2);
-    if (pointsAreEqual(playerCoords, rayLine[0])) {
+    if (pointsAreEqual(point1, rayLine[0])) {
         rayLine.reverse();
     }
     for (var i = rayLine.length - 1; i >= 0; i--) {
-        if (!pointIsValid(rayLine[i])) {
+        if (!pointIsValid(rayLine[i], ignorePeople, goOverLow)) {
             rayLine.pop();
             return rayLine.splice(i + 1);
         }
@@ -1533,7 +1595,29 @@ function raycast(point1, point2) {
  * @param {int} radius of circle to get points for
  */
 function getCircle(center, radius) {
+    var result = [];
+    var x = radius;
+    var y = 0;
+    var radiusError = 1 - x;
+    while (x >= y) {
+        result.push({ x: x + center.x, y: y + center.y });
+        result.push({ x: y + center.x, y: x + center.y });
+        result.push({ x: -x + center.x, y: y + center.y });
+        result.push({ x: -y + center.x, y: x + center.y });
+        result.push({ x: x + center.x, y: -y + center.y });
+        result.push({ x: y + center.x, y: -x + center.y });
+        result.push({ x: -x + center.x, y: -y + center.y });
+        result.push({ x: -y + center.x, y: -x + center.y });
+        y++;
 
+        if (radiusError < 0) {
+            radiusError += 2 * y + 1;
+        } else {
+            x--;
+            radiusError += 2 * (y - x + 1);
+        }
+    }
+    return result;
 }
 
 /**
@@ -1543,10 +1627,23 @@ function getCircle(center, radius) {
  */
 function getCircularExplosion(center, radius) {
     var outline = getCircle(center, radius);
+    outline.push(center);
+    // make the outline a bit thicker since raycasting on such a thin boy doesn't fill it out all the way depending on the radius
+    for(var i = outline.length - 1; i >= 0; i--) {
+        var slope = (outline[i].y - center.y) / (outline[i].x - center.x);
+        if(slope > 0.5 && outline[i].y > center.y){
+            outline.push({x: outline[i].x, y: outline[i].y - 1});
+        } else if (slope > 0.5 && outline[i].y < center.y){
+            outline.push({x: outline[i].x, y: outline[i].y + 1});
+        } else if (slope < 0.5 && outline[i].x > center.x){
+            outline.push({x: outline[i].x - 1, y: outline[i].y});
+        } else if (slope < 0.5 && outline[i].x < center.x){
+            outline.push({x: outline[i].x + 1, y: outline[i].y});
+        }
+    }
     var result = [];
-    console.log(outline);
     for (var i = 0; i < outline.length; i++) {
-        result = mergeArrays(result, raycast(center, outline[i]));
+        result = mergeArrays(result, raycast(center, outline[i], true, true));
     }
     return result;
 }
@@ -1632,7 +1729,10 @@ function newStoneTile() {
     return new Tile(1, [], "#A0A0A0", "Stone Floor");
 }
 function newOceanTile() {
-    return new Tile(101, [], "#5050BB", "Ocean")
+    return new Tile(1001, [], "#5050BB", "Ocean")
+}
+function newFlameTile(){
+    return new Tile(50, [], "#AA3333", "Flame");
 }
 
 function placeRectangle(corner1, corner2, tileFunction) {
@@ -1662,9 +1762,11 @@ function fillRectangle(corner1, corner2, tileFunction) {
     }
 }
 
-playerChar.inventory.push(new Equip("Sword of the Stinky", RARITY_EPIC, ARMOR_ONEHAND, "The stinkiest sword to ever grace humanity", "Images/none.png", 0));
-playerChar.inventory.push(new Equip("Poopy Claymore", RARITY_UNCOMMON, ARMOR_TWOHAND, "Big poop sword", "Images/none.png", 0));
+playerChar.inventory.push(new Equip("Sword", RARITY_EPIC, ARMOR_ONEHAND, "Test sword", "Images/none.png", 0));
+playerChar.inventory.push(new Equip("Claymore", RARITY_UNCOMMON, ARMOR_TWOHAND, "A two-handed weapon", "Images/none.png", 0));
 playerChar.inventory.push(new Equip("Ring", RARITY_EPIC, ARMOR_RING, "A ring lol", "Images/none.png", 0));
 
+gameMap[20][5].contents.push(new Character());
+gameMap[20][5].updateOverride();
 
 updateInventoryDisplay();
