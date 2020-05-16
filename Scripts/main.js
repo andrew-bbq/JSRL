@@ -73,6 +73,8 @@ var combatQueue = [];
 var tick = 0;
 var gameSpeed = 6;
 var playerTookTurn = false;
+var playerAp = 4;
+var maxAp = 8;
 
 // render - this is the main loop, update everything where the tick is specified
 function drawGame() {
@@ -137,6 +139,7 @@ function drawGame() {
             }
         }
         tick = 0;
+        updateAPDisplay();
     }
 
     ctx.fillStyle = "#ff0000";
@@ -252,6 +255,19 @@ function updateHealthDisplay() {
     document.getElementById("health-larm").innerHTML = "Left arm: " + playerChar.leftarm + "%";
     document.getElementById("health-rleg").innerHTML = "Right leg: " + playerChar.rightleg + "%";
     document.getElementById("health-lleg").innerHTML = "Left leg: " + playerChar.leftleg + "%";
+}
+
+function updateAPDisplay() {
+    for (var i = 0; i < maxAp; i++) {
+        var apid = "ap-dot-" + i;
+        var element = document.getElementById(apid);
+        element.classList.remove("ap-dot");
+    }
+    for (var i = 0; i < playerAp; i++) {
+        var apid = "ap-dot-" + i;
+        var element = document.getElementById(apid);
+        element.classList.add("ap-dot");
+    }
 }
 
 /**

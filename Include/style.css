@@ -34,3 +34,21 @@
 button {
     max-width: 60px;
 }
+
+.dot {
+    height: 25px;
+    width: 25px;
+    background-color: #c0c0c0;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 10px
+}
+
+.ap-dot {
+    margin-top: 4px;
+    height: 17px;
+    width: 17px;
+    background-color: #41a14d;
+    border-radius: 50%;
+    display: inline-block;
+}
